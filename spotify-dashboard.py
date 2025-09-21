@@ -5,7 +5,7 @@ from streamlit_autorefresh import st_autorefresh
 from datetime import datetime
 import pandas as pd
 
-# ---------- CSS ultra-compact + progress bar ----------
+# ---------- CSS ultra-compact + landscape ----------
 st.markdown(
     """
     <style>
@@ -19,25 +19,15 @@ st.markdown(
         color: white;
         font-size: 0.6rem;
     }
-    .tile img {max-width: 30px; height:auto;}
+    .tile img {max-width: 20px; height:auto;}
     .stDataFrame div[data-testid="stVerticalBlock"] {
         max-height: 100px; overflow-y:auto; font-size:0.6rem;
     }
     .stButton>button {padding:1px 2px; font-size:0.6rem;}
     .spotify-playing {animation: pulse 1s infinite;}
     @keyframes pulse {0%{opacity:0.6;}50%{opacity:1;}100%{opacity:0.6;}}
-    .progress-bar {
-        background-color: #1DB954;
-        height: 5px;
-        border-radius: 2px;
-    }
-    .progress-container {
-        background-color: #333;
-        width: 100%;
-        border-radius: 2px;
-        height: 5px;
-        margin-bottom: 2px;
-    }
+    .progress-bar {background-color: #1DB954; height: 5px; border-radius: 2px;}
+    .progress-container {background-color: #333; width: 100%; border-radius: 2px; height: 5px; margin-bottom: 2px;}
     </style>
     """, unsafe_allow_html=True
 )
@@ -84,68 +74,69 @@ sp = spotipy.Spotify(auth_manager=sp_oauth)
 # ---------- Auto-refresh ----------
 st_autorefresh(interval=2000, key="spotify-refresh")
 
-# ---------- Spotify tile ----------
-st.markdown('<div class="tile">', unsafe_allow_html=True)
-st.subheader("🎵 Spotify")
+# ---------- Landscape: 2 tiles ----------
+tile_spotify, tile_rit = st.columns([1.2,1])
 
-try:
-    current = sp.current_playback()
-    if current:
-        track = current["item"]["name"]
-        artist_names = ", ".join([a["name"] for a in current["item"]["artists"]])
-        st.image(current["item"]["album"]["images"][0]["url"])
-        status = "▶️" if current["is_playing"] else "⏸"
-        st.markdown(f'<span class="spotify-playing">{status}</span> {track} - {artist_names}', unsafe_allow_html=True)
+# -------- Spotify tile --------
+with tile_spotify:
+    st.markdown('<div class="tile">', unsafe_allow_html=True)
+    st.subheader("🎵 Spotify")
+    try:
+        current = sp.current_playback()
+        if current:
+            track = current["item"]["name"]
+            artist_names = ", ".join([a["name"] for a in current["item"]["artists"]])
+            st.image(current["item"]["album"]["images"][0]["url"], width=20)
+            status = "▶️" if current["is_playing"] else "⏸"
+            st.markdown(f'<span class="spotify-playing">{status}</span> {track} - {artist_names}', unsafe_allow_html=True)
 
-        # progressbar
-        progress_ms = current["progress_ms"]
-        duration_ms = current["item"]["duration_ms"]
-        progress_pct = int((progress_ms/duration_ms)*100)
-        st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{progress_pct}%"></div></div>', unsafe_allow_html=True)
+            # progressbar
+            progress_ms = current["progress_ms"]
+            duration_ms = current["item"]["duration_ms"]
+            progress_pct = int((progress_ms/duration_ms)*100)
+            st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{progress_pct}%"></div></div>', unsafe_allow_html=True)
 
-    else:
-        st.write("⏸️ Niks speelt nu")
-except:
-    st.write("Fout bij ophalen Spotify")
+        else:
+            st.write("⏸️ Niks speelt nu")
+    except:
+        st.write("Fout bij ophalen Spotify")
 
-# Playback controls
-c1,c2,c3=st.columns(3)
-with c1: st.button("⏮", key="prev")
-with c2: st.button("⏯", key="playpause")
-with c3: st.button("⏭", key="next")
-st.markdown('</div>', unsafe_allow_html=True)
+    c1,c2,c3 = st.columns(3)
+    with c1: st.button("⏮", key="prev")
+    with c2: st.button("⏯", key="playpause")
+    with c3: st.button("⏭", key="next")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# ---------- Rit tracker tile ----------
-st.markdown('<div class="tile">', unsafe_allow_html=True)
-st.subheader("🏁 Rit Tracker")
+# -------- Rit tile --------
+with tile_rit:
+    st.markdown('<div class="tile">', unsafe_allow_html=True)
+    st.subheader("🏁 Rit Tracker")
 
-if "ride_log" not in st.session_state: st.session_state.ride_log=[]
-if "last_ride_id" not in st.session_state: st.session_state.last_ride_id=0
+    if "ride_log" not in st.session_state: st.session_state.ride_log=[]
+    if "last_ride_id" not in st.session_state: st.session_state.last_ride_id=0
 
-if st.button("▶️", key="start"):
-    st.session_state.ride_start=datetime.now()
-    st.session_state.last_ride_id+=1
-if st.button("⏹", key="stop"):
+    if st.button("▶️", key="start"):
+        st.session_state.ride_start=datetime.now()
+        st.session_state.last_ride_id+=1
+    if st.button("⏹", key="stop"):
+        if "ride_start" in st.session_state:
+            end=datetime.now()
+            dur=(end-st.session_state.ride_start).total_seconds()
+            st.session_state.ride_log.append({
+                "rit":st.session_state.last_ride_id,
+                "start":st.session_state.ride_start.strftime('%H:%M:%S'),
+                "end":end.strftime('%H:%M:%S'),
+                "sec":round(dur,1)
+            })
+            del st.session_state.ride_start
+
+    # Live ritduur
     if "ride_start" in st.session_state:
-        end=datetime.now()
-        dur=(end-st.session_state.ride_start).total_seconds()
-        st.session_state.ride_log.append({
-            "rit":st.session_state.last_ride_id,
-            "start":st.session_state.ride_start.strftime('%H:%M:%S'),
-            "end":end.strftime('%H:%M:%S'),
-            "sec":round(dur,1)
-        })
-        del st.session_state.ride_start
+        live=(datetime.now()-st.session_state.ride_start).total_seconds()
+        st.write(f"⏱️ Huidige rit: {round(live,1)} sec")
 
-# Live ritduur
-if "ride_start" in st.session_state:
-    live=(datetime.now()-st.session_state.ride_start).total_seconds()
-    st.write(f"⏱️ Huidige rit: {round(live,1)} sec")
-
-df=pd.DataFrame(st.session_state.ride_log)
-st.dataframe(df, height=100)
-csv=df.to_csv(index=False).encode("utf-8")
-st.download_button("📥 CSV", csv, "ride_log.csv", key="dl")
-st.markdown('</div>', unsafe_allow_html=True)
-
-
+    df=pd.DataFrame(st.session_state.ride_log)
+    st.dataframe(df, height=100)
+    csv=df.to_csv(index=False).encode("utf-8")
+    st.download_button("📥 CSV", csv, "ride_log.csv", key="dl")
+    st.markdown('</div>', unsafe_allow_html=True)
