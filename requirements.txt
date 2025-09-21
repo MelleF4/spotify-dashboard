@@ -3,3 +3,5 @@ spotipy
 streamlit-autorefresh
 pandas
 plotly
+requests
+colorthief
