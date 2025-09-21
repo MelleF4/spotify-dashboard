@@ -9,9 +9,9 @@ from colorthief import ColorThief
 # -----------------------------
 # Spotify API setup met Streamlit Secrets
 # -----------------------------
-SPOTIPY_CLIENT_ID = st.secrets["CLIENT_ID"]
-SPOTIPY_CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
-SPOTIPY_REDIRECT_URI = st.secrets["REDIRECT_URI"]
+SPOTIPY_CLIENT_ID = st.secrets[CLIENT_ID]
+SPOTIPY_CLIENT_SECRET = st.secrets[CLIENT_SECRET]
+SPOTIPY_REDIRECT_URI = st.secrets[REDIRECT_URI]
 
 SCOPE = "user-read-playback-state user-modify-playback-state user-read-currently-playing"
 
@@ -139,4 +139,5 @@ with tabs[1]:
 
 with tabs[2]:
     st.write("Hier komen je instellingen")
+
 
