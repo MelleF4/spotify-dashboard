@@ -3,11 +3,11 @@ import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
 # ===============================
-# Spotify API settings
+# Spotify API settings via secrets
 # ===============================
-CLIENT_ID = "cefb6e54f4914a8283255ee8b7ae3396"
-CLIENT_SECRET = "df02aafe4e5240db82b5ab127b887212"
-REDIRECT_URI = "https://example.org/callback"  # moet exact gelijk zijn aan Spotify Developer Dashboard
+CLIENT_ID = st.secrets["CLIENT_ID"]
+CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
+REDIRECT_URI = st.secrets["REDIRECT_URI"]
 
 SCOPE = "user-read-playback-state user-read-currently-playing"
 
@@ -19,10 +19,27 @@ sp_oauth = SpotifyOAuth(
     client_secret=CLIENT_SECRET,
     redirect_uri=REDIRECT_URI,
     scope=SCOPE,
-    cache_path=".cache-spotify",   # sla tokens op
-    show_dialog=True               # dwing login af
+    cache_path=".cache-spotify",
+    show_dialog=True
 )
 
+# ===============================
+# Check of er al een token in cache staat
+# ===============================
+token_info = sp_oauth.get_cached_token()
+if not token_info:
+    st.info("🎯 Eerst even inloggen bij Spotify")
+    auth_url = sp_oauth.get_authorize_url()
+    st.write(f"[Klik hier om in te loggen]({auth_url})")
+    code = st.text_input("Plak hier de URL waar je naartoe werd gestuurd:", "")
+    if code:
+        code = sp_oauth.parse_response_code(code)
+        token_info = sp_oauth.get_access_token(code)
+        st.success("✅ Inloggen gelukt!")
+
+# ===============================
+# Spotipy client
+# ===============================
 sp = spotipy.Spotify(auth_manager=sp_oauth)
 
 # ===============================
@@ -30,13 +47,6 @@ sp = spotipy.Spotify(auth_manager=sp_oauth)
 # ===============================
 st.title("🚴‍♂️ Bike Spotify Dashboard")
 
-# Debug: laat token info zien
-token_info = sp_oauth.get_access_token(as_dict=True)
-st.write("Token info:", token_info)
-
-# ===============================
-# Huidige track ophalen
-# ===============================
 try:
     current = sp.current_playback()
     if current and current.get("is_playing"):
@@ -48,3 +58,4 @@ try:
         st.subheader("⏸️ Niks speelt nu")
 except Exception as e:
     st.error(f"Fout bij ophalen: {e}")
+
