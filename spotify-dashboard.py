@@ -9,7 +9,6 @@ import plotly.express as px
 # -------------------- CSS + Animaties --------------------
 st.markdown("""
 <style>
-/* Algemene tile styling */
 .tile {
     border: 1px solid #1DB954;
     border-radius: 8px;
@@ -22,63 +21,23 @@ st.markdown("""
     transition: all 0.3s ease;
 }
 .tile:hover {box-shadow: 0 4px 12px rgba(0,0,0,0.7); transform: translateY(-2px);}
-
-/* Album-art animatie */
-.tile img.album-art {
-    max-width: 40px; 
-    height: auto; 
-    border-radius: 4px;
-    animation: pulse 1.5s infinite;
-}
-@keyframes pulse {
-  0% { transform: scale(1); opacity: 0.8;}
-  50% { transform: scale(1.05); opacity: 1;}
-  100% { transform: scale(1); opacity: 0.8;}
-}
-
-/* Spotify-knoppen hover effect */
-.stButton>button {
-    padding:2px 4px; 
-    font-size:0.65rem;
-    border-radius: 4px;
-    transition: all 0.2s ease;
-}
-.stButton>button:hover {
-    background-color: #1DB954;
-    color: black;
-    transform: scale(1.1);
-}
-
-/* Progressbar animatie */
-.progress-bar {
-    background-color: #1DB954; 
-    height: 5px; 
-    border-radius: 2px;
-    transition: width 0.5s ease;
-}
-.progress-container {background-color: #333; width: 100%; border-radius: 2px; height: 5px; margin-bottom: 4px;}
-
-/* Ritlog fade-in */
-.stDataFrame div[data-testid="stVerticalBlock"] {
-    max-height: 120px; 
-    overflow-y:auto; 
-    font-size:0.6rem;
-    transition: all 0.5s ease-in;
-}
-
-/* Sidebar styling */
+.tile img.album-art {max-width:40px;height:auto;border-radius:4px;animation:pulse 1.5s infinite;}
+@keyframes pulse {0%{transform:scale(1);opacity:0.8;}50%{transform:scale(1.05);opacity:1;}100%{transform:scale(1);opacity:0.8;}}
+.stButton>button {padding:2px 4px;font-size:0.65rem;border-radius:4px;transition:all 0.2s ease;}
+.stButton>button:hover {background-color:#1DB954;color:black;transform:scale(1.1);}
+.progress-bar {background-color:#1DB954;height:5px;border-radius:2px;transition:width 0.5s ease;}
+.progress-container {background-color:#333;width:100%;border-radius:2px;height:5px;margin-bottom:4px;}
+.stDataFrame div[data-testid="stVerticalBlock"] {max-height:120px;overflow-y:auto;font-size:0.6rem;transition:all 0.5s ease-in;}
 .css-1d391kg {background-color:#121212;}
-.css-1v3fvcr {color:white; font-size:0.8rem;}
+.css-1v3fvcr {color:white;font-size:0.8rem;}
 </style>
 """, unsafe_allow_html=True)
 
-# Meta tags voor fullscreen mobiel
+# Fullscreen mobiel
 st.markdown("""
-<head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-</head>
 """, unsafe_allow_html=True)
 
 # -------------------- Spotify Auth --------------------
@@ -116,7 +75,6 @@ page = st.sidebar.radio("Navigatie", ["Spotify", "Rit Tracker", "Dashboard"])
 # -------------------- Spotify Page --------------------
 if page == "Spotify":
     st.markdown('<div class="tile">', unsafe_allow_html=True)
-    st.subheader("🎵 Spotify")
     try:
         current = sp.current_playback()
         if current and current["item"]:
@@ -125,7 +83,7 @@ if page == "Spotify":
             
             # Spotify-logo bovenaan
             spotify_logo = "https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_CMYK_Green.png"
-            st.image(spotify_logo, width=32)
+            st.image(spotify_logo, width=40)
             
             # Album-art klein met pulse animatie
             st.image(current["item"]["album"]["images"][0]["url"], width=40)
