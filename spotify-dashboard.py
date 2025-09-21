@@ -128,4 +128,5 @@ df_log = pd.DataFrame(st.session_state.ride_log)
 st.dataframe(df_log)
 
 # Download knop
-csv = df_log.to_csv(index=False).encode("utf-8"
+csv = df_log.to_csv(index=False).encode("utf-8")
+
