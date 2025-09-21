@@ -9,57 +9,49 @@ import plotly.express as px
 # -------------------- CSS Styling --------------------
 st.markdown("""
 <style>
-body {
+body, .stApp {
     background-color: #121212;
     font-family: Arial, sans-serif;
     color: white;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* geen scrollen */
+    height: 100vh;
 }
 .tile {
-    border: 1px solid #1DB954;
-    border-radius: 16px;
-    padding: 14px;
-    margin-bottom: 12px;
-    background: linear-gradient(145deg, #181818, #202020);
+    padding: 10px;
+    margin-bottom: 10px;
+    background: transparent; /* geen randen/schaduw */
     color: white;
     font-size: 0.8rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.6);
-    transition: all 0.3s ease;
     text-align: center;
     animation: fadeIn 0.8s ease;
 }
-.tile:hover {
-    box-shadow: 0 8px 20px rgba(0,0,0,0.8);
-    transform: translateY(-3px) scale(1.01);
-}
-@keyframes fadeIn {
-    from {opacity:0; transform:translateY(10px);}
-    to {opacity:1; transform:translateY(0);}
-}
-.album-art {
-    max-width: 70px;
-    border-radius: 8px;
-    animation: pulse 1.5s infinite;
-}
-@keyframes pulse {
-    0% {transform: scale(1); opacity: 0.9;}
-    50% {transform: scale(1.05); opacity: 1;}
-    100% {transform: scale(1); opacity: 0.9;}
-}
 .stButton>button {
-    padding: 12px;
-    font-size: 1rem;
+    padding: 14px;
+    font-size: 1.2rem;
     border-radius: 50%;
     transition: all 0.2s ease;
     background-color: #222;
     color: white;
-    border: 1px solid #1DB954;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    border: none;
+    margin: 0 20px;
 }
 .stButton>button:hover {
     background-color: #1DB954;
     color: black;
     transform: scale(1.15);
     box-shadow: 0 4px 12px rgba(29,185,84,0.6);
+}
+.album-art {
+    max-width: 70px;
+    border-radius: 10px;
+    animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+    0% {transform: scale(1); opacity: 0.9;}
+    50% {transform: scale(1.05); opacity: 1;}
+    100% {transform: scale(1); opacity: 0.9;}
 }
 .progress-container {
     background-color: #333;
@@ -74,17 +66,26 @@ body {
     border-radius: 4px;
     transition: width 0.5s ease;
 }
-.dataframe {
-    animation: fadeIn 0.8s ease;
+@keyframes fadeIn {
+    from {opacity:0; transform:translateY(10px);}
+    to {opacity:1; transform:translateY(0);}
+}
+.now-playing {
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+.now-playing span {
+    display: inline-block;
+    padding-left: 100%;
+    animation: scroll-text 12s linear infinite;
+}
+@keyframes scroll-text {
+    0% {transform: translateX(0);}
+    100% {transform: translateX(-100%);}
 }
 </style>
-""", unsafe_allow_html=True)
-
-# Fullscreen mobiel
-st.markdown("""
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
 """, unsafe_allow_html=True)
 
 # -------------------- Spotify Auth --------------------
@@ -121,22 +122,23 @@ page = st.sidebar.radio("📂 Navigatie", ["Spotify", "Rit Tracker", "Dashboard"
 
 # -------------------- Spotify Page --------------------
 if page == "Spotify":
-    st.markdown('<div class="tile">', unsafe_allow_html=True)
     try:
         current = sp.current_playback()
         if current and current["item"]:
             track = current["item"]["name"]
             artist_names = ", ".join([a["name"] for a in current["item"]["artists"]])
 
-            # Spotify-logo groot eye-catcher
+            # Spotify-logo als eye-catcher
             spotify_logo = "https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_CMYK_Green.png"
-            st.image(spotify_logo, width=150)
+            st.image(spotify_logo, width=200)
 
             # Album art
-            st.image(current["item"]["album"]["images"][0]["url"], width=70, output_format="auto")
+            st.image(current["item"]["album"]["images"][0]["url"], width=70)
 
-            # Track + artiest
-            st.markdown(f"**{track}**  \n<small>{artist_names}</small>", unsafe_allow_html=True)
+            # Track + artiest als scrollende tekst
+            st.markdown(f"""
+            <div class="now-playing"><span>🎶 {track} — {artist_names}</span></div>
+            """, unsafe_allow_html=True)
 
             # Progressbar
             progress_ms = current["progress_ms"]
@@ -167,11 +169,9 @@ if page == "Spotify":
         if st.button("⏭", key="next"): 
             try: sp.next_track()
             except: st.warning("Fout bij volgende track")
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # -------------------- Rit Tracker Page --------------------
 elif page == "Rit Tracker":
-    st.markdown('<div class="tile">', unsafe_allow_html=True)
     st.subheader("🏁 Rit Tracker")
     if "ride_log" not in st.session_state: st.session_state.ride_log=[]
     if "last_ride_id" not in st.session_state: st.session_state.last_ride_id=0
@@ -200,7 +200,6 @@ elif page == "Rit Tracker":
     st.dataframe(df, height=160)
     csv=df.to_csv(index=False).encode("utf-8")
     st.download_button("📥 CSV", csv, "ride_log.csv", key="dl")
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # -------------------- Dashboard Page --------------------
 elif page == "Dashboard":
@@ -213,7 +212,7 @@ elif page == "Dashboard":
                      color="sec",
                      color_continuous_scale=["#1DB954", "#1ed760"])
         fig.update_layout(
-            height=350,
+            height=300,
             margin=dict(l=10,r=10,t=40,b=10),
             font=dict(size=12,color="white"),
             plot_bgcolor="#121212",
