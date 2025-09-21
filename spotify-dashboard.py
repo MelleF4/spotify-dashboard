@@ -23,7 +23,7 @@ st.markdown("""
 .tile:hover {box-shadow: 0 4px 12px rgba(0,0,0,0.7); transform: translateY(-2px);}
 .tile img.album-art {max-width:40px;height:auto;border-radius:4px;animation:pulse 1.5s infinite;}
 @keyframes pulse {0%{transform:scale(1);opacity:0.8;}50%{transform:scale(1.05);opacity:1;}100%{transform:scale(1);opacity:0.8;}}
-.stButton>button {padding:2px 4px;font-size:0.65rem;border-radius:4px;transition:all 0.2s ease;}
+.stButton>button {padding:2px 4px;font-size:0.65rem;border-radius:50%;transition: all 0.2s ease;background-color:#333;color:white;}
 .stButton>button:hover {background-color:#1DB954;color:black;transform:scale(1.1);}
 .progress-bar {background-color:#1DB954;height:5px;border-radius:2px;transition:width 0.5s ease;}
 .progress-container {background-color:#333;width:100%;border-radius:2px;height:5px;margin-bottom:4px;}
@@ -81,9 +81,9 @@ if page == "Spotify":
             track = current["item"]["name"]
             artist_names = ", ".join([a["name"] for a in current["item"]["artists"]])
             
-            # Spotify-logo bovenaan
+            # Spotify-logo groter bovenaan
             spotify_logo = "https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_CMYK_Green.png"
-            st.image(spotify_logo, width=40)
+            st.image(spotify_logo, width=60)
             
             # Album-art klein met pulse animatie
             st.image(current["item"]["album"]["images"][0]["url"], width=40)
@@ -101,7 +101,7 @@ if page == "Spotify":
     except:
         st.write("Fout bij ophalen Spotify")
 
-    # Media knoppen
+    # Media knoppen in Spotify-style
     c1, c2, c3 = st.columns(3)
     with c1:
         if st.button("⏮", key="prev"):
