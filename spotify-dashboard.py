@@ -6,28 +6,69 @@ from datetime import datetime
 import pandas as pd
 import plotly.express as px
 
-# -------------------- CSS --------------------
+# -------------------- CSS + Animaties --------------------
 st.markdown("""
 <style>
-.main {padding: 0px 4px;}
+/* Algemene tile styling */
 .tile {
     border: 1px solid #1DB954;
-    border-radius: 6px;
-    padding: 4px;
-    margin-bottom: 6px;
+    border-radius: 8px;
+    padding: 6px;
+    margin-bottom: 8px;
     background-color: #121212;
     color: white;
     font-size: 0.65rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    transition: all 0.3s ease;
 }
-.tile img {max-width: 40px; height:auto; border-radius:4px;}
-.stDataFrame div[data-testid="stVerticalBlock"] {
-    max-height: 120px; overflow-y:auto; font-size:0.6rem;
+.tile:hover {box-shadow: 0 4px 12px rgba(0,0,0,0.7); transform: translateY(-2px);}
+
+/* Album-art animatie */
+.tile img {
+    max-width: 40px; 
+    height: auto; 
+    border-radius: 4px;
+    animation: pulse 1.5s infinite;
 }
-.stButton>button {padding:2px 4px; font-size:0.65rem;}
-.spotify-playing {animation: pulse 1s infinite;}
-@keyframes pulse {0%{opacity:0.6;}50%{opacity:1;}100%{opacity:0.6;}}
-.progress-bar {background-color: #1DB954; height: 5px; border-radius: 2px;}
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.8;}
+  50% { transform: scale(1.05); opacity: 1;}
+  100% { transform: scale(1); opacity: 0.8;}
+}
+
+/* Spotify-knoppen hover effect */
+.stButton>button {
+    padding:2px 4px; 
+    font-size:0.65rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+.stButton>button:hover {
+    background-color: #1DB954;
+    color: black;
+    transform: scale(1.1);
+}
+
+/* Progressbar animatie */
+.progress-bar {
+    background-color: #1DB954; 
+    height: 5px; 
+    border-radius: 2px;
+    transition: width 0.5s ease;
+}
 .progress-container {background-color: #333; width: 100%; border-radius: 2px; height: 5px; margin-bottom: 4px;}
+
+/* Ritlog fade-in */
+.stDataFrame div[data-testid="stVerticalBlock"] {
+    max-height: 120px; 
+    overflow-y:auto; 
+    font-size:0.6rem;
+    transition: all 0.5s ease-in;
+}
+
+/* Sidebar styling */
+.css-1d391kg {background-color:#121212;}
+.css-1v3fvcr {color:white; font-size:0.8rem;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -66,7 +107,7 @@ if not token_info:
 
 sp = spotipy.Spotify(auth_manager=sp_oauth)
 
-# -------------------- Auto-refresh Spotify --------------------
+# -------------------- Auto-refresh --------------------
 st_autorefresh(interval=2000, key="spotify-refresh")
 
 # -------------------- Sidebar Pages --------------------
@@ -122,10 +163,10 @@ elif page == "Rit Tracker":
     if "ride_log" not in st.session_state: st.session_state.ride_log=[]
     if "last_ride_id" not in st.session_state: st.session_state.last_ride_id=0
 
-    if st.button("▶️", key="start"):
+    if st.button("▶️ Start Rit", key="start"):
         st.session_state.ride_start=datetime.now()
         st.session_state.last_ride_id+=1
-    if st.button("⏹", key="stop"):
+    if st.button("⏹ Stop Rit", key="stop"):
         if "ride_start" in st.session_state:
             end=datetime.now()
             dur=(end-st.session_state.ride_start).total_seconds()
@@ -137,10 +178,12 @@ elif page == "Rit Tracker":
             })
             del st.session_state.ride_start
 
-    # Live ritduur
+    # Live ritduur met progressbar
     if "ride_start" in st.session_state:
         live=(datetime.now()-st.session_state.ride_start).total_seconds()
         st.write(f"⏱️ Huidige rit: {round(live,1)} sec")
+        # Live voortgangsbalk
+        st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{min(live*2,100)}%"></div></div>', unsafe_allow_html=True)
 
     df=pd.DataFrame(st.session_state.ride_log)
     st.dataframe(df, height=120)
@@ -153,9 +196,9 @@ elif page == "Dashboard":
     st.subheader("📊 Rit Dashboard")
     if "ride_log" in st.session_state and st.session_state.ride_log:
         df=pd.DataFrame(st.session_state.ride_log)
-        # Plot ritduur over rit
         fig = px.bar(df, x="rit", y="sec", labels={"sec":"Duur (s)","rit":"Ritnummer"},
-                     title="Ritduur per rit", color="sec", color_continuous_scale="Viridis")
+                     title="Ritduur per rit", color="sec", color_continuous_scale="Viridis",
+                     animation_frame="rit" if len(df)>1 else None)
         fig.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), font=dict(size=10))
         st.plotly_chart(fig, use_container_width=True)
     else:
