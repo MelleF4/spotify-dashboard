@@ -19,6 +19,7 @@ st.markdown("""
     font-size: 0.65rem;
     box-shadow: 0 2px 6px rgba(0,0,0,0.5);
     transition: all 0.3s ease;
+    text-align:center;
 }
 .tile:hover {box-shadow: 0 4px 12px rgba(0,0,0,0.7); transform: translateY(-2px);}
 .tile img.album-art {max-width:40px;height:auto;border-radius:4px;animation:pulse 1.5s infinite;}
@@ -81,9 +82,9 @@ if page == "Spotify":
             track = current["item"]["name"]
             artist_names = ", ".join([a["name"] for a in current["item"]["artists"]])
             
-            # Spotify-logo groter bovenaan
+            # Spotify-logo groot als eye-catcher
             spotify_logo = "https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_CMYK_Green.png"
-            st.image(spotify_logo, width=60)
+            st.image(spotify_logo, width=120)  # extra groot
             
             # Album-art klein met pulse animatie
             st.image(current["item"]["album"]["images"][0]["url"], width=40)
@@ -101,8 +102,8 @@ if page == "Spotify":
     except:
         st.write("Fout bij ophalen Spotify")
 
-    # Media knoppen in Spotify-style
-    c1, c2, c3 = st.columns(3)
+    # Media knoppen gecentreerd met afstand
+    c1, c2, c3 = st.columns([1,1,1])
     with c1:
         if st.button("⏮", key="prev"):
             try: sp.previous_track()
