@@ -122,9 +122,15 @@ if page == "Spotify":
         if current and current["item"]:
             track = current["item"]["name"]
             artist_names = ", ".join([a["name"] for a in current["item"]["artists"]])
-            st.image(current["item"]["album"]["images"][0]["url"], width=40, use_column_width=False, output_format="auto", caption=None, clamp=False, channels="RGB", format="PNG", output_type="auto", classes="album-art")
+            
+            # Spotify-logo bovenaan
             spotify_logo = "https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_CMYK_Green.png"
             st.image(spotify_logo, width=32)
+            
+            # Album-art klein met pulse animatie
+            st.image(current["item"]["album"]["images"][0]["url"], width=40)
+            
+            # Track + artiest
             st.markdown(f"**{track} - {artist_names}**", unsafe_allow_html=True)
 
             # progressbar
@@ -137,6 +143,7 @@ if page == "Spotify":
     except:
         st.write("Fout bij ophalen Spotify")
 
+    # Media knoppen
     c1, c2, c3 = st.columns(3)
     with c1:
         if st.button("⏮", key="prev"):
@@ -203,4 +210,3 @@ elif page == "Dashboard":
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.write("Geen ritdata beschikbaar")
-
