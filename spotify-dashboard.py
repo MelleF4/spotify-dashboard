@@ -5,9 +5,31 @@ from streamlit_autorefresh import st_autorefresh
 from datetime import datetime
 import pandas as pd
 
-# ===============================
-# Spotify Auth
-# ===============================
+# ---------- CSS voor fullscreen & tiles ----------
+st.markdown(
+    """
+    <style>
+    .main {
+        padding: 0px 5px;
+    }
+    .tile {
+        border: 2px solid #1DB954;
+        border-radius: 15px;
+        padding: 15px;
+        margin-bottom: 10px;
+        background-color: #121212;
+        color: white;
+    }
+    .stDataFrame div[data-testid="stVerticalBlock"] {
+        max-height: 250px;
+        overflow-y: auto;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# ---------- Spotify Auth ----------
 CLIENT_ID = st.secrets["CLIENT_ID"]
 CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
 REDIRECT_URI = st.secrets["REDIRECT_URI"]
@@ -35,21 +57,17 @@ if not token_info:
 
 sp = spotipy.Spotify(auth_manager=sp_oauth)
 
-# ===============================
-# Auto-refresh
-# ===============================
+# ---------- Auto-refresh ----------
 st_autorefresh(interval=5000, key="spotify-refresh")
 
-# ===============================
-# Mobile-friendly layout: 2 tiles
-# ===============================
-tile_spotify, tile_rit = st.columns([2, 1])
+# ---------- 2 Tiles: Spotify | Rit ----------
+tile_spotify, tile_rit = st.columns([2,1])
 
-# -------------------------------
-# Spotify tile
-# -------------------------------
+# -------- Spotify tile --------
 with tile_spotify:
+    st.markdown('<div class="tile">', unsafe_allow_html=True)
     st.subheader("🎵 Spotify")
+
     try:
         current = sp.current_playback()
         if current and current.get("is_playing"):
@@ -63,7 +81,6 @@ with tile_spotify:
             new_pos = st.slider("Seek", 0, duration_ms, progress_ms)
             if st.button("Set position"):
                 sp.seek_track(new_pos)
-
         else:
             st.write("⏸️ Niks speelt nu")
     except Exception as e:
@@ -84,12 +101,13 @@ with tile_spotify:
     with c3:
         if st.button("⏭ Skip"):
             sp.next_track()
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# -------------------------------
-# Rit tile
-# -------------------------------
+# -------- Rit tile --------
 with tile_rit:
+    st.markdown('<div class="tile">', unsafe_allow_html=True)
     st.subheader("🏁 Rit Tracker")
+
     if "ride_log" not in st.session_state:
         st.session_state.ride_log = []
     if "last_ride_id" not in st.session_state:
@@ -119,3 +137,4 @@ with tile_rit:
 
     csv = df_log.to_csv(index=False).encode("utf-8")
     st.download_button("Download ritlog als CSV", csv, "ride_log.csv")
+    st.markdown('</div>', unsafe_allow_html=True)
