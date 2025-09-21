@@ -5,26 +5,50 @@ from streamlit_autorefresh import st_autorefresh
 from datetime import datetime
 import pandas as pd
 
-# ---------- CSS voor fullscreen & tiles ----------
+# ---------- CSS voor fullscreen & compacte tiles ----------
 st.markdown(
     """
     <style>
+    /* Fullscreen body */
     .main {
         padding: 0px 5px;
     }
+
+    /* Compact tile */
     .tile {
         border: 2px solid #1DB954;
-        border-radius: 15px;
-        padding: 15px;
-        margin-bottom: 10px;
+        border-radius: 10px;
+        padding: 8px;
+        margin-bottom: 8px;
         background-color: #121212;
         color: white;
+        font-size: 0.9rem;
     }
+
+    /* Album-art kleiner */
+    .tile img {
+        max-width: 120px;
+        height: auto;
+    }
+
+    /* Scrollable dataframe */
     .stDataFrame div[data-testid="stVerticalBlock"] {
-        max-height: 250px;
+        max-height: 200px;
         overflow-y: auto;
     }
     </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# ---------- Meta tags voor fullscreen op mobiel ----------
+st.markdown(
+    """
+    <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    </head>
     """,
     unsafe_allow_html=True
 )
@@ -61,7 +85,7 @@ sp = spotipy.Spotify(auth_manager=sp_oauth)
 st_autorefresh(interval=5000, key="spotify-refresh")
 
 # ---------- 2 Tiles: Spotify | Rit ----------
-tile_spotify, tile_rit = st.columns([2,1])
+tile_spotify, tile_rit = st.columns([1.5,1])
 
 # -------- Spotify tile --------
 with tile_spotify:
@@ -89,17 +113,17 @@ with tile_spotify:
     # Playback controls
     c1, c2, c3 = st.columns(3)
     with c1:
-        if st.button("⏮ Vorige"):
+        if st.button("⏮"):
             sp.previous_track()
     with c2:
-        if st.button("⏯ Play/Pause"):
+        if st.button("⏯"):
             current = sp.current_playback()
             if current and current["is_playing"]:
                 sp.pause_playback()
             else:
                 sp.start_playback()
     with c3:
-        if st.button("⏭ Skip"):
+        if st.button("⏭"):
             sp.next_track()
     st.markdown('</div>', unsafe_allow_html=True)
 
