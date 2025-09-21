@@ -5,27 +5,39 @@ from streamlit_autorefresh import st_autorefresh
 from datetime import datetime
 import pandas as pd
 
-# ---------- CSS ultra-compact ----------
+# ---------- CSS ultra-compact + progress bar ----------
 st.markdown(
     """
     <style>
-    .main {padding: 0px 1px;}
+    .main {padding: 0px 2px;}
     .tile {
         border: 1px solid #1DB954;
         border-radius: 5px;
-        padding: 1px;
-        margin-bottom: 2px;
+        padding: 2px;
+        margin-bottom: 4px;
         background-color: #121212;
         color: white;
         font-size: 0.6rem;
     }
     .tile img {max-width: 30px; height:auto;}
     .stDataFrame div[data-testid="stVerticalBlock"] {
-        max-height: 80px; overflow-y:auto; font-size:0.6rem;
+        max-height: 100px; overflow-y:auto; font-size:0.6rem;
     }
     .stButton>button {padding:1px 2px; font-size:0.6rem;}
     .spotify-playing {animation: pulse 1s infinite;}
     @keyframes pulse {0%{opacity:0.6;}50%{opacity:1;}100%{opacity:0.6;}}
+    .progress-bar {
+        background-color: #1DB954;
+        height: 5px;
+        border-radius: 2px;
+    }
+    .progress-container {
+        background-color: #333;
+        width: 100%;
+        border-radius: 2px;
+        height: 5px;
+        margin-bottom: 2px;
+    }
     </style>
     """, unsafe_allow_html=True
 )
@@ -72,9 +84,10 @@ sp = spotipy.Spotify(auth_manager=sp_oauth)
 # ---------- Auto-refresh ----------
 st_autorefresh(interval=2000, key="spotify-refresh")
 
-# --------- Tiles verticaal ----------
+# ---------- Spotify tile ----------
 st.markdown('<div class="tile">', unsafe_allow_html=True)
 st.subheader("🎵 Spotify")
+
 try:
     current = sp.current_playback()
     if current:
@@ -83,20 +96,29 @@ try:
         st.image(current["item"]["album"]["images"][0]["url"])
         status = "▶️" if current["is_playing"] else "⏸"
         st.markdown(f'<span class="spotify-playing">{status}</span> {track} - {artist_names}', unsafe_allow_html=True)
+
+        # progressbar
+        progress_ms = current["progress_ms"]
+        duration_ms = current["item"]["duration_ms"]
+        progress_pct = int((progress_ms/duration_ms)*100)
+        st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{progress_pct}%"></div></div>', unsafe_allow_html=True)
+
     else:
         st.write("⏸️ Niks speelt nu")
 except:
     st.write("Fout bij ophalen Spotify")
 
+# Playback controls
 c1,c2,c3=st.columns(3)
 with c1: st.button("⏮", key="prev")
 with c2: st.button("⏯", key="playpause")
 with c3: st.button("⏭", key="next")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# -------- Rit tracker tile ----------
+# ---------- Rit tracker tile ----------
 st.markdown('<div class="tile">', unsafe_allow_html=True)
 st.subheader("🏁 Rit Tracker")
+
 if "ride_log" not in st.session_state: st.session_state.ride_log=[]
 if "last_ride_id" not in st.session_state: st.session_state.last_ride_id=0
 
@@ -121,7 +143,7 @@ if "ride_start" in st.session_state:
     st.write(f"⏱️ Huidige rit: {round(live,1)} sec")
 
 df=pd.DataFrame(st.session_state.ride_log)
-st.dataframe(df, height=80)
+st.dataframe(df, height=100)
 csv=df.to_csv(index=False).encode("utf-8")
 st.download_button("📥 CSV", csv, "ride_log.csv", key="dl")
 st.markdown('</div>', unsafe_allow_html=True)
