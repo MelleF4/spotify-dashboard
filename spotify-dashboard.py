@@ -2,7 +2,7 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from streamlit_autorefresh import st_autorefresh
-import plotly.express as px
+from datetime import datetime
 import pandas as pd
 
 # ===============================
@@ -48,46 +48,32 @@ sp = spotipy.Spotify(auth_manager=sp_oauth)
 st_autorefresh(interval=5000, key="spotify-refresh")
 
 # ===============================
-# Streamlit UI
+# Streamlit UI - Spotify
 # ===============================
 st.title("🚴‍♂️ Bike Spotify Dashboard")
 
 try:
     current = sp.current_playback()
     if current and current.get("is_playing"):
-        # Track info
         track = current["item"]["name"]
         artist_names = ", ".join([a["name"] for a in current["item"]["artists"]])
         st.subheader(f"▶️ Now Playing: {track} - {artist_names}")
         st.image(current["item"]["album"]["images"][0]["url"])
 
-        # ===============================
         # Seek-bar
-        # ===============================
         duration_ms = current["item"]["duration_ms"]
         progress_ms = current["progress_ms"]
-
         new_pos = st.slider("🎵 Seek", 0, duration_ms, progress_ms)
         if st.button("Set position"):
             sp.seek_track(new_pos)
-
-        # ===============================
-        # Live Plotly grafiek (voorbeeld: huidige artiest)
-        # ===============================
-        df = pd.DataFrame({"Artist": [current["item"]["artists"][0]["name"]], "Plays": [1]})
-        fig = px.bar(df, x="Artist", y="Plays", title="Live Artist Plays")
-        st.plotly_chart(fig)
 
     else:
         st.subheader("⏸️ Niks speelt nu")
 except Exception as e:
     st.error(f"Fout bij ophalen: {e}")
 
-# ===============================
 # Playback controls
-# ===============================
 col1, col2, col3 = st.columns(3)
-
 with col1:
     if st.button("⏮ Vorige"):
         sp.previous_track()
@@ -101,3 +87,45 @@ with col2:
 with col3:
     if st.button("⏭ Skip"):
         sp.next_track()
+
+# ===============================
+# Rit tracking met ritnummer
+# ===============================
+st.header("🏁 Rit Tracker")
+
+# Initieer rit-log
+if "ride_log" not in st.session_state:
+    st.session_state.ride_log = []
+
+# Ritnummer
+if "last_ride_id" not in st.session_state:
+    st.session_state.last_ride_id = 0
+
+col_start, col_stop = st.columns(2)
+with col_start:
+    if st.button("Start rit"):
+        st.session_state.ride_start = datetime.now()
+        st.session_state.last_ride_id += 1
+        st.success(f"Rit #{st.session_state.last_ride_id} gestart op {st.session_state.ride_start.strftime('%H:%M:%S')}")
+
+with col_stop:
+    if st.button("Stop rit"):
+        if "ride_start" in st.session_state:
+            end_time = datetime.now()
+            st.session_state.ride_log.append({
+                "rit_id": st.session_state.last_ride_id,
+                "start": st.session_state.ride_start.strftime('%Y-%m-%d %H:%M:%S'),
+                "end": end_time.strftime('%Y-%m-%d %H:%M:%S')
+            })
+            st.success(f"Rit #{st.session_state.last_ride_id} gestopt op {end_time.strftime('%H:%M:%S')}")
+            del st.session_state.ride_start
+        else:
+            st.warning("Je moet eerst een rit starten!")
+
+# Toon ritlog
+st.subheader("📒 Ritten")
+df_log = pd.DataFrame(st.session_state.ride_log)
+st.dataframe(df_log)
+
+# Download knop
+csv = df_log.to_csv(index=False).encode("utf-8"
