@@ -5,43 +5,45 @@ from streamlit_autorefresh import st_autorefresh
 from datetime import datetime
 import pandas as pd
 
-# ---------- CSS voor fullscreen & compacte tiles ----------
+# ---------- CSS voor ultra-compact tiles ----------
 st.markdown(
     """
     <style>
-    /* Fullscreen body */
     .main {
-        padding: 0px 5px;
+        padding: 0px 3px;
     }
 
-    /* Compact tile */
     .tile {
         border: 2px solid #1DB954;
-        border-radius: 10px;
-        padding: 8px;
-        margin-bottom: 8px;
+        border-radius: 8px;
+        padding: 4px;          /* super compact */
+        margin-bottom: 6px;
         background-color: #121212;
         color: white;
-        font-size: 0.9rem;
+        font-size: 0.8rem;     /* kleiner lettertype */
     }
 
-    /* Album-art kleiner */
     .tile img {
-        max-width: 120px;
+        max-width: 80px;       /* kleinere album-art */
         height: auto;
     }
 
-    /* Scrollable dataframe */
     .stDataFrame div[data-testid="stVerticalBlock"] {
-        max-height: 200px;
+        max-height: 150px;
         overflow-y: auto;
+    }
+
+    /* Compact buttons */
+    .stButton>button {
+        padding: 4px 6px;
+        font-size: 0.8rem;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-# ---------- Meta tags voor fullscreen op mobiel ----------
+# ---------- Meta tags voor fullscreen ----------
 st.markdown(
     """
     <head>
@@ -85,7 +87,7 @@ sp = spotipy.Spotify(auth_manager=sp_oauth)
 st_autorefresh(interval=5000, key="spotify-refresh")
 
 # ---------- 2 Tiles: Spotify | Rit ----------
-tile_spotify, tile_rit = st.columns([1.5,1])
+tile_spotify, tile_rit = st.columns([1.2,1])
 
 # -------- Spotify tile --------
 with tile_spotify:
@@ -102,15 +104,15 @@ with tile_spotify:
 
             duration_ms = current["item"]["duration_ms"]
             progress_ms = current["progress_ms"]
-            new_pos = st.slider("Seek", 0, duration_ms, progress_ms)
-            if st.button("Set position"):
+            new_pos = st.slider("", 0, duration_ms, progress_ms)
+            if st.button("⏩"):  # kleinere button
                 sp.seek_track(new_pos)
         else:
             st.write("⏸️ Niks speelt nu")
     except Exception as e:
         st.error(f"Fout bij ophalen: {e}")
 
-    # Playback controls
+    # Playback controls (emoji-only)
     c1, c2, c3 = st.columns(3)
     with c1:
         if st.button("⏮"):
@@ -137,12 +139,12 @@ with tile_rit:
     if "last_ride_id" not in st.session_state:
         st.session_state.last_ride_id = 0
 
-    if st.button("Start rit"):
+    if st.button("▶️"):
         st.session_state.ride_start = datetime.now()
         st.session_state.last_ride_id += 1
         st.success(f"Rit #{st.session_state.last_ride_id} gestart!")
 
-    if st.button("Stop rit"):
+    if st.button("⏹"):
         if "ride_start" in st.session_state:
             end_time = datetime.now()
             st.session_state.ride_log.append({
@@ -155,10 +157,10 @@ with tile_rit:
         else:
             st.warning("Start eerst een rit!")
 
-    st.subheader("📒 Ritten")
     df_log = pd.DataFrame(st.session_state.ride_log)
-    st.dataframe(df_log)
+    st.dataframe(df_log, height=150)
 
     csv = df_log.to_csv(index=False).encode("utf-8")
-    st.download_button("Download ritlog als CSV", csv, "ride_log.csv")
+    st.download_button("📥 CSV", csv, "ride_log.csv", key="download")
     st.markdown('</div>', unsafe_allow_html=True)
+
