@@ -2,6 +2,8 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from streamlit_autorefresh import st_autorefresh
+import plotly.express as px
+import pandas as pd
 
 # ===============================
 # Spotify API settings via secrets
@@ -24,9 +26,6 @@ sp_oauth = SpotifyOAuth(
     show_dialog=True
 )
 
-# ===============================
-# Check of er al een token in cache staat
-# ===============================
 token_info = sp_oauth.get_cached_token()
 if not token_info:
     st.info("🎯 Eerst even inloggen bij Spotify")
@@ -56,10 +55,29 @@ st.title("🚴‍♂️ Bike Spotify Dashboard")
 try:
     current = sp.current_playback()
     if current and current.get("is_playing"):
+        # Track info
         track = current["item"]["name"]
-        artist = ", ".join([a["name"] for a in current["item"]["artists"]])
-        st.subheader(f"▶️ Now Playing: {track} - {artist}")
+        artist_names = ", ".join([a["name"] for a in current["item"]["artists"]])
+        st.subheader(f"▶️ Now Playing: {track} - {artist_names}")
         st.image(current["item"]["album"]["images"][0]["url"])
+
+        # ===============================
+        # Seek-bar
+        # ===============================
+        duration_ms = current["item"]["duration_ms"]
+        progress_ms = current["progress_ms"]
+
+        new_pos = st.slider("🎵 Seek", 0, duration_ms, progress_ms)
+        if st.button("Set position"):
+            sp.seek_track(new_pos)
+
+        # ===============================
+        # Live Plotly grafiek (voorbeeld: huidige artiest)
+        # ===============================
+        df = pd.DataFrame({"Artist": [current["item"]["artists"][0]["name"]], "Plays": [1]})
+        fig = px.bar(df, x="Artist", y="Plays", title="Live Artist Plays")
+        st.plotly_chart(fig)
+
     else:
         st.subheader("⏸️ Niks speelt nu")
 except Exception as e:
@@ -83,3 +101,9 @@ with col2:
 with col3:
     if st.button("⏭ Skip"):
         sp.next_track()
+
+            sp.start_playback()
+with col3:
+    if st.button("⏭ Skip"):
+        sp.next_track()
+
