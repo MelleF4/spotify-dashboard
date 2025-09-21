@@ -4,8 +4,9 @@ from spotipy.oauth2 import SpotifyOAuth
 from streamlit_autorefresh import st_autorefresh
 from datetime import datetime
 import pandas as pd
+import time
 
-# ---------- CSS ultra-compact ----------
+# ---------- CSS ultra-compact + animaties ----------
 st.markdown(
     """
     <style>
@@ -24,7 +25,7 @@ st.markdown(
     }
 
     .tile img {
-        max-width: 60px;
+        max-width: 40px;
         height: auto;
     }
 
@@ -36,6 +37,16 @@ st.markdown(
     .stButton>button {
         padding: 2px 4px;
         font-size: 0.7rem;
+    }
+
+    .spotify-playing {
+        animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+        0% {opacity: 0.6;}
+        50% {opacity: 1;}
+        100% {opacity: 0.6;}
     }
     </style>
     """,
@@ -83,10 +94,10 @@ if not token_info:
 sp = spotipy.Spotify(auth_manager=sp_oauth)
 
 # ---------- Auto-refresh ----------
-st_autorefresh(interval=5000, key="spotify-refresh")
+st_autorefresh(interval=3000, key="spotify-refresh")
 
-# ---------- Columns 1.1 : 1 ----------
-tile_spotify, tile_rit = st.columns([1.1, 1])
+# ---------- 2 Tiles: Spotify | Rit ----------
+tile_spotify, tile_rit = st.columns([1.2,1])
 
 # -------- Spotify tile --------
 with tile_spotify:
@@ -95,11 +106,15 @@ with tile_spotify:
 
     try:
         current = sp.current_playback()
-        if current and current.get("is_playing"):
+        if current:
             track = current["item"]["name"]
             artist_names = ", ".join([a["name"] for a in current["item"]["artists"]])
+            # kleine album-art
             st.image(current["item"]["album"]["images"][0]["url"])
-            st.write(f"{track} - {artist_names}")
+
+            # Speelstatus animatie
+            status = "▶️" if current["is_playing"] else "⏸"
+            st.markdown(f'<span class="spotify-playing">{status}</span> {track} - {artist_names}', unsafe_allow_html=True)
 
             duration_ms = current["item"]["duration_ms"]
             progress_ms = current["progress_ms"]
@@ -111,6 +126,7 @@ with tile_spotify:
     except Exception as e:
         st.error(f"Fout bij ophalen: {e}")
 
+    # Playback controls (emoji-only)
     c1, c2, c3 = st.columns(3)
     with c1:
         if st.button("⏮"):
@@ -137,6 +153,7 @@ with tile_rit:
     if "last_ride_id" not in st.session_state:
         st.session_state.last_ride_id = 0
 
+    # Start/Stop rit
     if st.button("▶️"):
         st.session_state.ride_start = datetime.now()
         st.session_state.last_ride_id += 1
@@ -145,15 +162,22 @@ with tile_rit:
     if st.button("⏹"):
         if "ride_start" in st.session_state:
             end_time = datetime.now()
+            duration = (end_time - st.session_state.ride_start).total_seconds()
             st.session_state.ride_log.append({
                 "rit_id": st.session_state.last_ride_id,
                 "start": st.session_state.ride_start.strftime('%Y-%m-%d %H:%M:%S'),
-                "end": end_time.strftime('%Y-%m-%d %H:%M:%S')
+                "end": end_time.strftime('%Y-%m-%d %H:%M:%S'),
+                "duur_sec": round(duration,1)
             })
             st.success(f"Rit #{st.session_state.last_ride_id} gestopt!")
             del st.session_state.ride_start
         else:
             st.warning("Start eerst een rit!")
+
+    # Live ritduur
+    if "ride_start" in st.session_state:
+        live_duration = (datetime.now() - st.session_state.ride_start).total_seconds()
+        st.write(f"⏱️ Huidige rit: {round(live_duration,1)} sec")
 
     df_log = pd.DataFrame(st.session_state.ride_log)
     st.dataframe(df_log, height=120)
@@ -161,3 +185,4 @@ with tile_rit:
     csv = df_log.to_csv(index=False).encode("utf-8")
     st.download_button("📥 CSV", csv, "ride_log.csv", key="download")
     st.markdown('</div>', unsafe_allow_html=True)
+
