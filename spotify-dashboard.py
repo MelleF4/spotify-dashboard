@@ -1,18 +1,17 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-import os
 import requests
 from io import BytesIO
 from PIL import Image
 from colorthief import ColorThief
 
 # -----------------------------
-# Spotify API setup
+# Spotify API setup met Streamlit Secrets
 # -----------------------------
-SPOTIPY_CLIENT_ID = os.getenv("SPOTIPY_CLIENT_ID")
-SPOTIPY_CLIENT_SECRET = os.getenv("SPOTIPY_CLIENT_SECRET")
-SPOTIPY_REDIRECT_URI = "http://localhost:8501/callback"
+SPOTIPY_CLIENT_ID = st.secrets["SPOTIPY_CLIENT_ID"]
+SPOTIPY_CLIENT_SECRET = st.secrets["SPOTIPY_CLIENT_SECRET"]
+SPOTIPY_REDIRECT_URI = st.secrets["SPOTIPY_REDIRECT_URI"]
 
 SCOPE = "user-read-playback-state user-modify-playback-state user-read-currently-playing"
 
@@ -24,7 +23,7 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
 ))
 
 # -----------------------------
-# Helper functions
+# Helper functies
 # -----------------------------
 def get_current_track():
     current = sp.current_playback()
@@ -35,14 +34,11 @@ def get_current_track():
     artist = ", ".join([a["name"] for a in track["artists"]])
     album_cover_url = track["album"]["images"][0]["url"]
 
-    # extract album colors
     try:
-        response = requests.get(album_cover_url)
-        img = Image.open(BytesIO(response.content))
-        color_thief = ColorThief(BytesIO(response.content))
+        color_thief = ColorThief(BytesIO(requests.get(album_cover_url).content))
         dominant_color = color_thief.get_color(quality=1)
     except:
-        dominant_color = (30, 215, 96)  # Spotify green
+        dominant_color = (30, 215, 96)  # Spotify green fallback
 
     return {
         "title": track["name"],
@@ -71,25 +67,11 @@ def media_controls():
 def visualizer():
     st.markdown("""
         <style>
-        .bar-container {
-            display: flex;
-            justify-content: center;
-            gap: 6px;
-            margin: 10px 0;
-        }
-        .bar {
-            width: 4px;
-            height: 15px;
-            background: white;
-            border-radius: 2px;
-            animation: bounce 1s infinite;
-        }
-        .bar:nth-child(2) { animation-delay: 0.2s; }
-        .bar:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes bounce {
-            0%, 100% { height: 10px; }
-            50% { height: 30px; }
-        }
+        .bar-container {display:flex; justify-content:center; gap:6px; margin:10px 0;}
+        .bar {width:4px; height:15px; background:white; border-radius:2px; animation:bounce 1s infinite;}
+        .bar:nth-child(2) { animation-delay:0.2s; }
+        .bar:nth-child(3) { animation-delay:0.4s; }
+        @keyframes bounce {0%,100%{height:10px;}50%{height:30px;}}
         </style>
         <div class="bar-container">
             <div class="bar"></div>
@@ -99,13 +81,9 @@ def visualizer():
     """, unsafe_allow_html=True)
 
 # -----------------------------
-# Page layout
+# Pagina layout
 # -----------------------------
-st.set_page_config(
-    page_title="Spotify Dashboard",
-    page_icon="🎵",
-    layout="wide"
-)
+st.set_page_config(page_title="Spotify Dashboard", page_icon="🎵", layout="wide")
 
 # Hide Streamlit chrome
 st.markdown("""
@@ -123,45 +101,34 @@ if track:
 else:
     bg_color = "linear-gradient(135deg, #1DB954, #000000)"
 
-# Background styling
 st.markdown(f"""
     <style>
-    body {{
-        background: {bg_color};
-    }}
+    body {{background: {bg_color};}}
     </style>
 """, unsafe_allow_html=True)
 
-# -----------------------------
 # Spotify Section
-# -----------------------------
-st.markdown(
-    """
+st.markdown("""
     <div style="text-align:center;">
         <img src="https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg"
-             style="width:90px; margin-bottom:15px;">
+             style="width:100px; margin-bottom:15px;">
     </div>
-    """, unsafe_allow_html=True
-)
+""", unsafe_allow_html=True)
 
 if track:
-    st.markdown(
-        f"""
+    st.markdown(f"""
         <div style="text-align:center; color:white;">
             <img src="{track['cover_url']}" style="width:110px; border-radius:12px; margin-bottom:10px;">
             <div style="font-size:16px; font-weight:bold;">{track['title']} – {track['artist']}</div>
         </div>
-        """, unsafe_allow_html=True
-    )
+    """, unsafe_allow_html=True)
 
     visualizer()
     media_controls()
 else:
     st.markdown("<div style='text-align:center; color:white;'>No track playing</div>", unsafe_allow_html=True)
 
-# -----------------------------
 # Tabs (subpages)
-# -----------------------------
 tabs = st.tabs(["🚴 Ritten", "📊 Statistieken", "⚙️ Instellingen"])
 
 with tabs[0]:
