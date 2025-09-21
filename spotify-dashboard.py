@@ -24,7 +24,7 @@ st.markdown("""
 .tile:hover {box-shadow: 0 4px 12px rgba(0,0,0,0.7); transform: translateY(-2px);}
 
 /* Album-art animatie */
-.tile img {
+.tile img.album-art {
     max-width: 40px; 
     height: auto; 
     border-radius: 4px;
@@ -122,9 +122,10 @@ if page == "Spotify":
         if current and current["item"]:
             track = current["item"]["name"]
             artist_names = ", ".join([a["name"] for a in current["item"]["artists"]])
-            st.image(current["item"]["album"]["images"][0]["url"], width=40)
-            status = "▶️" if current["is_playing"] else "⏸"
-            st.markdown(f'<span class="spotify-playing">{status}</span> {track} - {artist_names}', unsafe_allow_html=True)
+            st.image(current["item"]["album"]["images"][0]["url"], width=40, use_column_width=False, output_format="auto", caption=None, clamp=False, channels="RGB", format="PNG", output_type="auto", classes="album-art")
+            spotify_logo = "https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_CMYK_Green.png"
+            st.image(spotify_logo, width=32)
+            st.markdown(f"**{track} - {artist_names}**", unsafe_allow_html=True)
 
             # progressbar
             progress_ms = current["progress_ms"]
@@ -182,7 +183,6 @@ elif page == "Rit Tracker":
     if "ride_start" in st.session_state:
         live=(datetime.now()-st.session_state.ride_start).total_seconds()
         st.write(f"⏱️ Huidige rit: {round(live,1)} sec")
-        # Live voortgangsbalk
         st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{min(live*2,100)}%"></div></div>', unsafe_allow_html=True)
 
     df=pd.DataFrame(st.session_state.ride_log)
@@ -203,3 +203,4 @@ elif page == "Dashboard":
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.write("Geen ritdata beschikbaar")
+
