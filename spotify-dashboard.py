@@ -101,9 +101,3 @@ with col2:
 with col3:
     if st.button("⏭ Skip"):
         sp.next_track()
-
-            sp.start_playback()
-with col3:
-    if st.button("⏭ Skip"):
-        sp.next_track()
-
