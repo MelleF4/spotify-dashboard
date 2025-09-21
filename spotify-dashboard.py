@@ -1,7 +1,7 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-from streamlit_autorefresh import st_autorefresh
+from time import sleep
 
 # ===============================
 # Spotify API settings via secrets
@@ -10,7 +10,7 @@ CLIENT_ID = st.secrets["CLIENT_ID"]
 CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
 REDIRECT_URI = st.secrets["REDIRECT_URI"]
 
-SCOPE = "user-read-playback-state user-read-currently-playing"
+SCOPE = "user-read-playback-state user-modify-playback-state user-read-currently-playing"
 
 # ===============================
 # Auth manager met cache
@@ -46,7 +46,9 @@ sp = spotipy.Spotify(auth_manager=sp_oauth)
 # ===============================
 # Auto-refresh elke 5 seconden
 # ===============================
-st_autorefresh(interval=5000, key="spotify-refresh")  # refresh elke 5 seconden
+st_autorefresh_key = st.empty()
+st_autorefresh_key.text("Refreshing...")
+st.experimental_rerun()
 
 # ===============================
 # Streamlit UI
@@ -64,3 +66,22 @@ try:
         st.subheader("⏸️ Niks speelt nu")
 except Exception as e:
     st.error(f"Fout bij ophalen: {e}")
+
+# ===============================
+# Playback controls
+# ===============================
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    if st.button("⏮ Vorige"):
+        sp.previous_track()
+with col2:
+    if st.button("⏯ Play/Pause"):
+        current = sp.current_playback()
+        if current and current["is_playing"]:
+            sp.pause_playback()
+        else:
+            sp.start_playback()
+with col3:
+    if st.button("⏭ Skip"):
+        sp.next_track()
