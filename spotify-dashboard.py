@@ -1,6 +1,7 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+from streamlit_autorefresh import st_autorefresh
 
 # ===============================
 # Spotify API settings via secrets
@@ -43,6 +44,11 @@ if not token_info:
 sp = spotipy.Spotify(auth_manager=sp_oauth)
 
 # ===============================
+# Auto-refresh elke 5 seconden
+# ===============================
+st_autorefresh(interval=5000, key="spotify-refresh")  # refresh elke 5 seconden
+
+# ===============================
 # Streamlit UI
 # ===============================
 st.title("🚴‍♂️ Bike Spotify Dashboard")
@@ -58,4 +64,3 @@ try:
         st.subheader("⏸️ Niks speelt nu")
 except Exception as e:
     st.error(f"Fout bij ophalen: {e}")
-
