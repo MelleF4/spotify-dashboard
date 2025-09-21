@@ -1,7 +1,7 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-from time import sleep
+from streamlit_autorefresh import st_autorefresh
 
 # ===============================
 # Spotify API settings via secrets
@@ -46,9 +46,7 @@ sp = spotipy.Spotify(auth_manager=sp_oauth)
 # ===============================
 # Auto-refresh elke 5 seconden
 # ===============================
-st_autorefresh_key = st.empty()
-st_autorefresh_key.text("Refreshing...")
-st.experimental_rerun()
+st_autorefresh(interval=5000, key="spotify-refresh")
 
 # ===============================
 # Streamlit UI
