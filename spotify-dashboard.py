@@ -6,31 +6,77 @@ from datetime import datetime
 import pandas as pd
 import plotly.express as px
 
-# -------------------- CSS + Animaties --------------------
+# -------------------- CSS Styling --------------------
 st.markdown("""
 <style>
+body {
+    background-color: #121212;
+    font-family: Arial, sans-serif;
+    color: white;
+}
 .tile {
     border: 1px solid #1DB954;
-    border-radius: 8px;
-    padding: 6px;
-    margin-bottom: 8px;
-    background-color: #121212;
+    border-radius: 16px;
+    padding: 14px;
+    margin-bottom: 12px;
+    background: linear-gradient(145deg, #181818, #202020);
     color: white;
-    font-size: 0.65rem;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    font-size: 0.8rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.6);
     transition: all 0.3s ease;
-    text-align:center;
+    text-align: center;
+    animation: fadeIn 0.8s ease;
 }
-.tile:hover {box-shadow: 0 4px 12px rgba(0,0,0,0.7); transform: translateY(-2px);}
-.tile img.album-art {max-width:40px;height:auto;border-radius:4px;animation:pulse 1.5s infinite;}
-@keyframes pulse {0%{transform:scale(1);opacity:0.8;}50%{transform:scale(1.05);opacity:1;}100%{transform:scale(1);opacity:0.8;}}
-.stButton>button {padding:2px 4px;font-size:0.65rem;border-radius:50%;transition: all 0.2s ease;background-color:#333;color:white;}
-.stButton>button:hover {background-color:#1DB954;color:black;transform:scale(1.1);}
-.progress-bar {background-color:#1DB954;height:5px;border-radius:2px;transition:width 0.5s ease;}
-.progress-container {background-color:#333;width:100%;border-radius:2px;height:5px;margin-bottom:4px;}
-.stDataFrame div[data-testid="stVerticalBlock"] {max-height:120px;overflow-y:auto;font-size:0.6rem;transition:all 0.5s ease-in;}
-.css-1d391kg {background-color:#121212;}
-.css-1v3fvcr {color:white;font-size:0.8rem;}
+.tile:hover {
+    box-shadow: 0 8px 20px rgba(0,0,0,0.8);
+    transform: translateY(-3px) scale(1.01);
+}
+@keyframes fadeIn {
+    from {opacity:0; transform:translateY(10px);}
+    to {opacity:1; transform:translateY(0);}
+}
+.album-art {
+    max-width: 70px;
+    border-radius: 8px;
+    animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+    0% {transform: scale(1); opacity: 0.9;}
+    50% {transform: scale(1.05); opacity: 1;}
+    100% {transform: scale(1); opacity: 0.9;}
+}
+.stButton>button {
+    padding: 12px;
+    font-size: 1rem;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+    background-color: #222;
+    color: white;
+    border: 1px solid #1DB954;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
+.stButton>button:hover {
+    background-color: #1DB954;
+    color: black;
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(29,185,84,0.6);
+}
+.progress-container {
+    background-color: #333;
+    width: 100%;
+    border-radius: 4px;
+    height: 6px;
+    margin: 8px 0;
+}
+.progress-bar {
+    background: linear-gradient(90deg, #1DB954, #1ed760);
+    height: 6px;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+.dataframe {
+    animation: fadeIn 0.8s ease;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -68,10 +114,10 @@ if not token_info:
 sp = spotipy.Spotify(auth_manager=sp_oauth)
 
 # -------------------- Auto-refresh --------------------
-st_autorefresh(interval=2000, key="spotify-refresh")
+st_autorefresh(interval=2500, key="spotify-refresh")
 
 # -------------------- Sidebar Pages --------------------
-page = st.sidebar.radio("Navigatie", ["Spotify", "Rit Tracker", "Dashboard"])
+page = st.sidebar.radio("📂 Navigatie", ["Spotify", "Rit Tracker", "Dashboard"])
 
 # -------------------- Spotify Page --------------------
 if page == "Spotify":
@@ -81,18 +127,18 @@ if page == "Spotify":
         if current and current["item"]:
             track = current["item"]["name"]
             artist_names = ", ".join([a["name"] for a in current["item"]["artists"]])
-            
-            # Spotify-logo groot als eye-catcher
-            spotify_logo = "https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_CMYK_Green.png"
-            st.image(spotify_logo, width=120)  # extra groot
-            
-            # Album-art klein met pulse animatie
-            st.image(current["item"]["album"]["images"][0]["url"], width=40)
-            
-            # Track + artiest
-            st.markdown(f"**{track} - {artist_names}**", unsafe_allow_html=True)
 
-            # progressbar
+            # Spotify-logo groot eye-catcher
+            spotify_logo = "https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_CMYK_Green.png"
+            st.image(spotify_logo, width=150)
+
+            # Album art
+            st.image(current["item"]["album"]["images"][0]["url"], width=70, output_format="auto")
+
+            # Track + artiest
+            st.markdown(f"**{track}**  \n<small>{artist_names}</small>", unsafe_allow_html=True)
+
+            # Progressbar
             progress_ms = current["progress_ms"]
             duration_ms = current["item"]["duration_ms"]
             progress_pct = int((progress_ms/duration_ms)*100)
@@ -100,16 +146,16 @@ if page == "Spotify":
         else:
             st.write("⏸️ Niks speelt nu")
     except:
-        st.write("Fout bij ophalen Spotify")
+        st.write("⚠️ Fout bij ophalen Spotify")
 
-    # Media knoppen gecentreerd met afstand
+    # Media knoppen gecentreerd
     c1, c2, c3 = st.columns([1,1,1])
     with c1:
-        if st.button("⏮", key="prev"):
+        if st.button("⏮", key="prev"): 
             try: sp.previous_track()
             except: st.warning("Fout bij vorige track")
     with c2:
-        if st.button("⏯", key="playpause"):
+        if st.button("⏯", key="playpause"): 
             try:
                 current = sp.current_playback()
                 if current and current["is_playing"]:
@@ -118,7 +164,7 @@ if page == "Spotify":
                     sp.start_playback()
             except: st.warning("Fout bij play/pause")
     with c3:
-        if st.button("⏭", key="next"):
+        if st.button("⏭", key="next"): 
             try: sp.next_track()
             except: st.warning("Fout bij volgende track")
     st.markdown('</div>', unsafe_allow_html=True)
@@ -145,14 +191,13 @@ elif page == "Rit Tracker":
             })
             del st.session_state.ride_start
 
-    # Live ritduur met progressbar
     if "ride_start" in st.session_state:
         live=(datetime.now()-st.session_state.ride_start).total_seconds()
         st.write(f"⏱️ Huidige rit: {round(live,1)} sec")
         st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{min(live*2,100)}%"></div></div>', unsafe_allow_html=True)
 
     df=pd.DataFrame(st.session_state.ride_log)
-    st.dataframe(df, height=120)
+    st.dataframe(df, height=160)
     csv=df.to_csv(index=False).encode("utf-8")
     st.download_button("📥 CSV", csv, "ride_log.csv", key="dl")
     st.markdown('</div>', unsafe_allow_html=True)
@@ -162,10 +207,20 @@ elif page == "Dashboard":
     st.subheader("📊 Rit Dashboard")
     if "ride_log" in st.session_state and st.session_state.ride_log:
         df=pd.DataFrame(st.session_state.ride_log)
-        fig = px.bar(df, x="rit", y="sec", labels={"sec":"Duur (s)","rit":"Ritnummer"},
-                     title="Ritduur per rit", color="sec", color_continuous_scale="Viridis",
-                     animation_frame="rit" if len(df)>1 else None)
-        fig.update_layout(height=300, margin=dict(l=10,r=10,t=30,b=10), font=dict(size=10))
+        fig = px.bar(df, x="rit", y="sec",
+                     labels={"sec":"Duur (s)","rit":"Ritnummer"},
+                     title="⏱ Ritduur per rit",
+                     color="sec",
+                     color_continuous_scale=["#1DB954", "#1ed760"])
+        fig.update_layout(
+            height=350,
+            margin=dict(l=10,r=10,t=40,b=10),
+            font=dict(size=12,color="white"),
+            plot_bgcolor="#121212",
+            paper_bgcolor="#121212"
+        )
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.write("Geen ritdata beschikbaar")
+        st.info("🚴 Geen ritdata beschikbaar")
+
+
