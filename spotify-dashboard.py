@@ -5,24 +5,33 @@ import requests
 from streamlit_folium import st_folium
 import folium
 
-# --- Spotify API Setup ---
+# --- Spotify Setup ---
 CLIENT_ID = st.secrets["CLIENT_ID"]
 CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
 REDIRECT_URI = st.secrets["REDIRECT_URI"]
 SCOPE = "user-read-playback-state user-modify-playback-state"
 
-auth_manager = SpotifyOAuth(
-    client_id=CLIENT_ID,
-    client_secret=CLIENT_SECRET,
-    redirect_uri=REDIRECT_URI,
-    scope=SCOPE,
-    cache_path=".spotifycache",  # zorgt dat je niet steeds hoeft in te loggen
-)
-sp = spotipy.Spotify(auth_manager=auth_manager)
+# login + tokenbeheer via Streamlit session
+if "token_info" not in st.session_state:
+    st.session_state.token_info = None
 
-# --- Geocoding + Routing ---
+def get_spotify_client():
+    """Geef een ingelogde Spotify client terug, of None als nog niet ingelogd."""
+    auth_manager = SpotifyOAuth(
+        client_id=CLIENT_ID,
+        client_secret=CLIENT_SECRET,
+        redirect_uri=REDIRECT_URI,
+        scope=SCOPE,
+        show_dialog=True,
+        cache_path=".spotifycache"
+    )
+    if st.session_state.token_info:
+        return spotipy.Spotify(auth=st.session_state.token_info["access_token"])
+    else:
+        return None
+
+# --- OSM helpers ---
 def geocode_location(place):
-    """Geef coördinaten terug voor een adres via Nominatim (OSM)."""
     url = f"https://nominatim.openstreetmap.org/search?q={place}&format=json&limit=1"
     r = requests.get(url, headers={"User-Agent": "streamlit-spotify-dashboard"})
     data = r.json()
@@ -31,7 +40,6 @@ def geocode_location(place):
     return float(data[0]["lat"]), float(data[0]["lon"])
 
 def get_route(start_coords, end_coords):
-    """Haal route op van OSRM tussen twee coördinaten."""
     url = (
         f"http://router.project-osrm.org/route/v1/driving/"
         f"{start_coords[1]},{start_coords[0]};{end_coords[1]},{end_coords[0]}"
@@ -55,34 +63,50 @@ tabs = st.tabs(["🎵 Spotify", "🗺️ Navigatie"])
 with tabs[0]:
     st.subheader("Spotify Controls")
 
-    try:
-        current = sp.current_playback()
-    except Exception:
-        current = None
+    auth_manager = SpotifyOAuth(
+        client_id=CLIENT_ID,
+        client_secret=CLIENT_SECRET,
+        redirect_uri=REDIRECT_URI,
+        scope=SCOPE,
+        show_dialog=True,
+        cache_path=".spotifycache"
+    )
 
-    if current and current.get("item"):
-        track = current["item"]["name"]
-        artist = current["item"]["artists"][0]["name"]
-        cover = current["item"]["album"]["images"][1]["url"]
-
-        st.image(cover, width=120)
-        st.markdown(f"**{track}** – {artist}")
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            if st.button("⏮️ Vorige"):
-                sp.previous_track()
-        with col2:
-            if st.button("⏯️ Play/Pause"):
-                if current["is_playing"]:
-                    sp.pause_playback()
-                else:
-                    sp.start_playback()
-        with col3:
-            if st.button("⏭️ Volgende"):
-                sp.next_track()
+    # login knop
+    if not st.session_state.token_info:
+        auth_url = auth_manager.get_authorize_url()
+        st.markdown(f"[👉 Login met Spotify]({auth_url})")
     else:
-        st.info("Geen muziek aan het spelen of geen device actief.")
+        sp = get_spotify_client()
+
+        try:
+            current = sp.current_playback()
+        except Exception:
+            current = None
+
+        if current and current.get("item"):
+            track = current["item"]["name"]
+            artist = current["item"]["artists"][0]["name"]
+            cover = current["item"]["album"]["images"][1]["url"]
+
+            st.image(cover, width=120)
+            st.markdown(f"**{track}** – {artist}")
+
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                if st.button("⏮️ Vorige"):
+                    sp.previous_track()
+            with col2:
+                if st.button("⏯️ Play/Pause"):
+                    if current["is_playing"]:
+                        sp.pause_playback()
+                    else:
+                        sp.start_playback()
+            with col3:
+                if st.button("⏭️ Volgende"):
+                    sp.next_track()
+        else:
+            st.info("Geen muziek aan het spelen of geen device actief.")
 
 # --- Navigatie Tab ---
 with tabs[1]:
@@ -105,8 +129,11 @@ with tabs[1]:
                 m = folium.Map(location=start_coords, zoom_start=7, tiles="cartodb dark_matter")
                 folium.Marker(start_coords, tooltip="Start").add_to(m)
                 folium.Marker(end_coords, tooltip="Bestemming").add_to(m)
-                folium.PolyLine(locations=[(lat, lon) for lon, lat in route],
-                                color="lime", weight=5).add_to(m)
+                folium.PolyLine(
+                    locations=[(lat, lon) for lon, lat in route],
+                    color="lime",
+                    weight=5
+                ).add_to(m)
                 st_folium(m, width=700, height=400)
 
                 st.subheader("🚦 Instructies")
