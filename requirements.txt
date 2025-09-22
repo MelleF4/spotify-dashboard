@@ -1,7 +1,9 @@
 streamlit
 spotipy
-streamlit-autorefresh
 pandas
-plotly
 requests
+Pillow
 colorthief
+folium
+streamlit-folium
+plotly
