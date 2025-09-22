@@ -1,321 +1,438 @@
-# spotify_dashboard_pro.py
+# spotify_dashboard.py
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-from streamlit_autorefresh import st_autorefresh
-from datetime import datetime
+import requests
+from io import BytesIO
+from PIL import Image
+from colorthief import ColorThief
 import pandas as pd
+import folium
+from streamlit_folium import st_folium
+from datetime import datetime
+import time
 import plotly.express as px
 
-import requests
-import tempfile
-from colorthief import ColorThief
-import math
-
-# -------------------- Helpers --------------------
-def rgb_to_hex(rgb_tuple):
-    return '#%02x%02x%02x' % rgb_tuple
-
-def get_dominant_color_from_url(url):
-    """Download image to temp file and return dominant RGB hex via ColorThief.
-       Returns None if fails."""
-    try:
-        r = requests.get(url, timeout=4)
-        r.raise_for_status()
-        with tempfile.NamedTemporaryFile(delete=True, suffix=".jpg") as f:
-            f.write(r.content)
-            f.flush()
-            ct = ColorThief(f.name)
-            dominant = ct.get_color(quality=1)
-            return rgb_to_hex(dominant)
-    except Exception:
-        return None
-
-def sec_to_hms(sec):
-    sec = int(round(sec))
-    h = sec // 3600
-    m = (sec % 3600) // 60
-    s = sec % 60
-    if h:
-        return f"{h}h {m}m {s}s"
-    if m:
-        return f"{m}m {s}s"
-    return f"{s}s"
-
-# -------------------- CSS base (we will inject dynamic bg later) --------------------
-BASE_CSS = """
-<style>
-/* App layout */
-body, .stApp { background-color: #0d0d0d; margin:0; padding:0; height:100vh; overflow:hidden; }
-.app-wrap { height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; }
-
-/* Spotify tile - we'll override background-color inline */
-.spotify-tile {
-    width: 96%;
-    max-width: 820px;
-    border-radius: 14px;
-    padding: 14px;
-    margin-top: 10px;
-    color: white;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-    box-sizing: border-box;
-    transition: background 0.4s ease, transform 0.25s ease;
-}
-.spotify-tile:hover { transform: translateY(-3px); }
-
-/* album & text */
-.row { display:flex; align-items:center; gap:12px; }
-.album-art { width:70px; height:auto; border-radius:8px; animation: pulse 1.5s infinite; box-shadow: 0 6px 18px rgba(0,0,0,0.6); }
-@keyframes pulse { 0%{transform:scale(1);opacity:0.95} 50%{transform:scale(1.04);opacity:1} 100%{transform:scale(1);opacity:0.95} }
-
-.track-info { text-align:left; overflow:hidden; }
-.track-title { font-weight:700; font-size:16px; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:520px; }
-.track-artist { margin:0; font-size:12px; color:rgba(255,255,255,0.85); }
-
-/* progress */
-.progress-container { background: rgba(0,0,0,0.35); border-radius:6px; height:7px; width:100%; margin-top:8px; overflow:hidden; }
-.progress-bar { height:100%; border-radius:6px; transition: width 0.5s linear; }
-
-/* equalizer */
-.equalizer { display:inline-flex; gap:4px; align-items:end; margin-left:6px; }
-.eq-bar { width:4px; background: rgba(255,255,255,0.9); border-radius:2px; animation: eq 0.9s infinite linear; opacity:0.9; transform-origin: bottom; }
-.eq-bar.eq-1 { animation-delay: 0s; }
-.eq-bar.eq-2 { animation-delay: 0.12s; }
-.eq-bar.eq-3 { animation-delay: 0.24s; }
-@keyframes eq {
-  0% { height:6px; opacity:0.6 }
-  50% { height:20px; opacity:1 }
-  100% { height:6px; opacity:0.6 }
-}
-
-/* control buttons row */
-.controls { display:flex; justify-content:center; gap:28px; margin-top:10px; align-items:center; }
-.stButton>button { width:46px; height:46px; border-radius:50%; background:#222; color:white; border:none; font-size:18px; transition: all 0.18s ease; }
-.stButton>button:hover { transform:scale(1.12); background:#1DB954; color:black; box-shadow: 0 6px 18px rgba(29,185,84,0.18); }
-
-/* small text */
-.small { font-size:12px; color:rgba(255,255,255,0.85); }
-
-/* Ritten tile and dashboard styles */
-.rit-tile, .dash-tile {
-    width: 96%;
-    max-width: 820px;
-    border-radius: 12px;
-    padding: 10px;
-    margin-top: 12px;
-    background: linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-    box-sizing: border-box;
-}
-
-/* hide Streamlit default footer/padding that may cause scrollbars */
-footer {visibility:hidden;}
-header {visibility:hidden;}
-</style>
-"""
-
-st.set_page_config(page_title="Spotify Ride Dashboard", layout="centered", initial_sidebar_state="expanded")
-st.markdown(BASE_CSS, unsafe_allow_html=True)
-
-# -------------------- Spotify Auth --------------------
+# -------------------------
+# CONFIG / SECRETS
+# -------------------------
+st.set_page_config(page_title="Spotify Ride Dashboard", page_icon="🎵", layout="wide")
+# Make sure you have CLIENT_ID, CLIENT_SECRET, REDIRECT_URI in Streamlit secrets.
 CLIENT_ID = st.secrets["CLIENT_ID"]
 CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
 REDIRECT_URI = st.secrets["REDIRECT_URI"]
-SCOPE = "user-read-playback-state user-modify-playback-state user-read-currently-playing,user-read-currently-playing"
 
-sp_oauth = SpotifyOAuth(client_id=CLIENT_ID,
-                        client_secret=CLIENT_SECRET,
-                        redirect_uri=REDIRECT_URI,
-                        scope=SCOPE,
-                        cache_path=".cache-spotify",
-                        show_dialog=True)
+SCOPE = "user-read-playback-state user-modify-playback-state user-read-currently-playing"
 
-token_info = sp_oauth.get_cached_token()
-if not token_info:
-    st.info("🎯 Eerst inloggen bij Spotify")
-    auth_url = sp_oauth.get_authorize_url()
-    st.write(f"[Klik hier om in te loggen]({auth_url})")
-    code = st.text_input("Plak hier de URL waar je naartoe werd gestuurd:", "")
-    if code:
-        code = sp_oauth.parse_response_code(code)
-        token_info = sp_oauth.get_access_token(code)
-        st.success("✅ Inloggen gelukt!")
+# -------------------------
+# Spotify auth
+# -------------------------
+# Use cache_path so the refresh token is stored in a local file (.cache-spotify)
+auth_manager = SpotifyOAuth(
+    client_id=CLIENT_ID,
+    client_secret=CLIENT_SECRET,
+    redirect_uri=REDIRECT_URI,
+    scope=SCOPE,
+    cache_path=".cache-spotify",
+    show_dialog=True
+)
+sp = spotipy.Spotify(auth_manager=auth_manager)
 
-sp = spotipy.Spotify(auth_manager=sp_oauth)
+# -------------------------
+# Helpers: color, track, geocode, routing
+# -------------------------
+def rgb_to_css(r,g,b,a=1.0):
+    return f"rgba({r},{g},{b},{a})"
 
-# -------------------- Auto-refresh --------------------
-# Spotify info refresh often to animate equalizer & progress
-st_autorefresh(interval=1500, key="spotify-refresh")
+def get_current_track_info():
+    """Return dict with track info or None."""
+    try:
+        current = sp.current_playback()
+    except Exception:
+        return None
+    if not current or not current.get("item"):
+        return None
+    item = current["item"]
+    title = item.get("name", "")
+    artists = ", ".join([a.get("name","") for a in item.get("artists",[])])
+    images = item.get("album", {}).get("images", [])
+    cover = images[0]["url"] if images else None
+    is_playing = bool(current.get("is_playing"))
+    progress_ms = current.get("progress_ms", 0)
+    duration_ms = item.get("duration_ms", 1)
+    try:
+        # try dominant color
+        resp = requests.get(cover, timeout=4)
+        resp.raise_for_status()
+        ct = ColorThief(BytesIO(resp.content))
+        dominant = ct.get_color(quality=1)
+    except Exception:
+        dominant = (30,215,96)  # spotify green fallback
+    return {
+        "title": title,
+        "artists": artists,
+        "cover": cover,
+        "is_playing": is_playing,
+        "progress_pct": int((progress_ms / max(duration_ms,1)) * 100),
+        "dominant": dominant
+    }
 
-# -------------------- Sidebar Pages --------------------
-page = st.sidebar.radio("Navigatie", ["Spotify", "Ritten", "Dashboard"])
+# Geocoding with Nominatim (OpenStreetMap) - cached for repeated queries
+@st.cache_data(ttl=60*60)
+def geocode_address(q):
+    """Return (lat, lon) for address q or None."""
+    q = q.strip()
+    # If already lat,lon string -> parse
+    if "," in q:
+        try:
+            parts = [p.strip() for p in q.split(",")]
+            if len(parts) == 2:
+                lat = float(parts[0]); lon = float(parts[1])
+                if -90 <= lat <= 90 and -180 <= lon <= 180:
+                    return lat, lon
+        except Exception:
+            pass
+    NOMINATIM = "https://nominatim.openstreetmap.org/search"
+    try:
+        res = requests.get(NOMINATIM, params={"q": q, "format": "json", "limit": 1},
+                           headers={"User-Agent":"SpotifyRideDashboard/1.0 (+https://example.org)"},
+                           timeout=8)
+        res.raise_for_status()
+        data = res.json()
+        if not data:
+            return None
+        lat = float(data[0]["lat"]); lon = float(data[0]["lon"])
+        return lat, lon
+    except Exception:
+        return None
 
-# Ensure ride log in session
-if "ride_log" not in st.session_state:
-    st.session_state.ride_log = []
-if "last_ride_id" not in st.session_state:
-    st.session_state.last_ride_id = 0
+@st.cache_data(ttl=60*10)
+def osrm_route(lat1, lon1, lat2, lon2):
+    """
+    Query public OSRM instance for route.
+    Returns dict with geojson, steps, distance_m, duration_s or None on failure.
+    """
+    OSRM = "http://router.project-osrm.org/route/v1/driving"
+    coords = f"{lon1},{lat1};{lon2},{lat2}"
+    params = {"overview":"full", "geometries":"geojson", "steps":"true", "annotations":"duration,distance"}
+    try:
+        r = requests.get(f"{OSRM}/{coords}", params=params, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+        if data.get("code") != "Ok":
+            return None
+        route = data["routes"][0]
+        geojson = route["geometry"]  # LineString
+        distance_m = route.get("distance", 0)
+        duration_s = route.get("duration", 0)
+        steps = []
+        for leg in route.get("legs", []):
+            for s in leg.get("steps", []):
+                maneuver = s.get("maneuver", {})
+                typ = maneuver.get("type", "")
+                mod = maneuver.get("modifier", "")
+                name = s.get("name","")
+                # build user-friendly instruction
+                txt = ""
+                if typ:
+                    txt = typ
+                if mod:
+                    txt += f" {mod}"
+                if name:
+                    txt += f" onto {name}"
+                txt = txt.strip()
+                steps.append({"text": txt if txt else name, "distance_m": s.get("distance",0)})
+        return {"geojson": geojson, "steps": steps, "distance_m": distance_m, "duration_s": duration_s}
+    except Exception:
+        return None
 
-# -------------------- Spotify Page --------------------
-if page == "Spotify":
-    # fetch playback info
+# -------------------------
+# UI Styling (CarPlay-like dark)
+# -------------------------
+st.markdown("""
+<style>
+/* remove default padding */
+.block-container { padding: 0 6px; }
+
+/* overall background */
+html, body, .stApp {
+  background: linear-gradient(180deg,#070707,#0a0a0a);
+}
+
+/* header logo center */
+.top-logo { display:flex; justify-content:center; padding-top:10px; }
+
+/* spotify tile */
+.spotify-tile { text-align:center; padding:12px 8px; margin-top:6px; }
+
+/* album glow is set inline via box-shadow in the img tag */
+
+/* visualizer */
+.viz { display:flex; justify-content:center; gap:6px; margin-top:8px; }
+.viz .bar { width:6px; background:white; border-radius:3px; animation:bounce 1s infinite; opacity:0.95; }
+.viz .bar.b2 { animation-delay:0.12s; }
+.viz .bar.b3 { animation-delay:0.24s; }
+@keyframes bounce { 0%,100%{height:12px;} 50%{height:34px;} }
+
+/* control buttons style */
+.controls { display:flex; justify-content:center; gap:28px; margin-top:12px; }
+.controls button { width:64px; height:64px; border-radius:50%; border:none; background:#111; color:white; font-size:20px; transition:transform .12s ease; }
+.controls button:hover { transform:scale(1.08); background:#1DB954; color:#000; box-shadow:0 8px 24px rgba(29,185,84,0.18); }
+
+/* tabs content */
+.tab-block { padding:12px 8px; }
+
+/* small muted */
+.muted { color: rgba(255,255,255,0.75); font-size:13px; }
+
+/* metrics */
+.metric-box { display:flex; gap:14px; justify-content:space-around; align-items:center; margin-top:8px; }
+.metric { background: rgba(255,255,255,0.03); padding:10px 14px; border-radius:10px; width:22%; text-align:center; }
+
+/* make folium map center nicely */
+.folium-container { display:flex; justify-content:center; }
+</style>
+""", unsafe_allow_html=True)
+
+# -------------------------
+# Session state init for rides
+# -------------------------
+if "rides" not in st.session_state:
+    st.session_state["rides"] = []  # each ride: dict with start_ts, end_ts, sec, optional distance
+if "ride_active" not in st.session_state:
+    st.session_state["ride_active"] = False
+if "ride_start_ts" not in st.session_state:
+    st.session_state["ride_start_ts"] = None
+if "refresh_interval" not in st.session_state:
+    st.session_state["refresh_interval"] = 5  # seconds default
+
+# -------------------------
+# Page: top Spotify tile (always visible)
+# -------------------------
+track_info = None
+try:
+    track_info = get_current_track_info()
+except Exception:
+    track_info = None
+
+st.markdown('<div class="top-logo"><img src="https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg" style="width:140px;"/></div>', unsafe_allow_html=True)
+st.markdown('<div class="spotify-tile">', unsafe_allow_html=True)
+
+if track_info:
+    title = track_info["title"]
+    artists = track_info["artists"]
+    cover = track_info["cover"]
+    dom = track_info["dominant"]
+    is_playing = track_info["is_playing"]
+    progress_pct = track_info["progress_pct"]
+    r,g,b = dom
+
+    # album with glow using dominant color
+    box_css = f"box-shadow: 0 0 46px rgba({r},{g},{b},0.65);"
+    st.markdown(f'''
+        <div style="text-align:center;color:white;">
+            <img src="{cover}" style="width:140px;border-radius:14px; {box_css}"/>
+            <div style="font-weight:700; font-size:18px; margin-top:8px;">{title}</div>
+            <div class="muted" style="margin-top:4px;">{artists}</div>
+        </div>
+    ''', unsafe_allow_html=True)
+
+    # progress bar
+    st.markdown(f'''
+        <div style="width:80%; margin:10px auto 0; background:rgba(255,255,255,0.06); height:8px; border-radius:6px;">
+            <div style="height:100%; width:{progress_pct}%; background: linear-gradient(90deg,#1DB954,#1ed760); border-radius:6px;"></div>
+        </div>
+    ''', unsafe_allow_html=True)
+
+    # visualizer (only when playing)
+    if is_playing:
+        st.markdown('''
+            <div class="viz">
+                <div class="bar b1"></div>
+                <div class="bar b2"></div>
+                <div class="bar b3"></div>
+            </div>
+        ''', unsafe_allow_html=True)
+    else:
+        # small paused indicator
+        st.markdown('<div class="muted" style="margin-top:8px;">⏸️ Paused</div>', unsafe_allow_html=True)
+
+    # controls (use JS-free simple buttons)
+    cols = st.columns([1,1,1])
+    with cols[0]:
+        if st.button("⏮️", key="prev_track"):
+            try:
+                sp.previous_track()
+            except Exception:
+                st.warning("Kon vorige track niet sturen.")
+    with cols[1]:
+        if st.button("⏯️", key="play_pause"):
+            try:
+                curr = sp.current_playback()
+                if curr and curr.get("is_playing"):
+                    sp.pause_playback()
+                else:
+                    sp.start_playback()
+            except Exception:
+                st.warning("Kon play/pause niet sturen.")
+    with cols[2]:
+        if st.button("⏭️", key="next_track"):
+            try:
+                sp.next_track()
+            except Exception:
+                st.warning("Kon volgende track niet sturen.")
+else:
+    st.markdown('<div style="text-align:center;color:white;padding:18px 0;">Geen afspeelinformatie beschikbaar</div>', unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# Auto-refresh control in settings will adjust st.experimental_rerun interval; we do lightweight rerun on demand
+# -------------------------
+# Main tabs
+# -------------------------
+tabs = st.tabs(["🎵 Spotify", "🚴 Ritten", "📊 Statistieken", "⚙️ Instellingen", "🗺️ Navigatie"])
+
+# --------- Tab 0: Spotify (more detailed controls / refresh) ----------
+with tabs[0]:
+    st.markdown('<div class="tab-block">', unsafe_allow_html=True)
+    st.subheader("Spotify — controls & info")
     try:
         current = sp.current_playback()
     except Exception:
         current = None
-
-    # default accent
-    accent_hex = "#1DB954"
-
-    album_url = None
-    is_playing = False
-    track = None
-    artist_names = None
-    progress_pct = 0
-
     if current and current.get("item"):
-        is_playing = bool(current.get("is_playing"))
-        item = current["item"]
-        track = item.get("name")
-        artists = item.get("artists", [])
-        artist_names = ", ".join([a.get("name") for a in artists])
-        album_images = item.get("album", {}).get("images", [])
-        if album_images:
-            album_url = album_images[0].get("url")
-        try:
-            progress_ms = current.get("progress_ms", 0)
-            duration_ms = item.get("duration_ms", 1)
-            progress_pct = int((progress_ms / max(duration_ms,1)) * 100)
-        except Exception:
-            progress_pct = 0
-
-        # try to extract dominant color
-        if album_url:
-            color_hex = get_dominant_color_from_url(album_url)
-            if color_hex:
-                accent_hex = color_hex
-
-    # build inline style for spotify tile using accent color (a bit darkened for bg)
-    # create a translucent background using rgb
-    def hex_to_rgb(h):
-        h = h.lstrip('#')
-        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
-    try:
-        r,g,b = hex_to_rgb(accent_hex)
-        bg_style = f"background: linear-gradient(180deg, rgba({r},{g},{b},0.08), rgba({r},{g},{b},0.03)); border: none;"
-        prog_style = f"background: linear-gradient(90deg, {accent_hex}, #1ed760);"
-    except Exception:
-        bg_style = ""
-        prog_style = f"background: linear-gradient(90deg, #1DB954, #1ed760);"
-
-    # render Spotify tile
-    st.markdown(f'<div class="spotify-tile" style="{bg_style}">', unsafe_allow_html=True)
-
-    # big spotify logo in header
-    spotify_logo = "https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_CMYK_Green.png"
-    st.image(spotify_logo, width=140)
-
-    # content row
-    if track:
-        st.markdown('<div class="row">', unsafe_allow_html=True)
-        # album
-        if album_url:
-            # album image
-            st.markdown(f'<img class="album-art" src="{album_url}" />', unsafe_allow_html=True)
-        # info
-        st.markdown('<div class="track-info">', unsafe_allow_html=True)
-        st.markdown(f'<div class="track-title">{track}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="track-artist small">{artist_names}</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # progressbar (with accent)
-        st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{progress_pct}%; {prog_style}"></div></div>', unsafe_allow_html=True)
+        st.write(f"**{current['item']['name']}** — {', '.join([a['name'] for a in current['item']['artists']])}")
+        st.write(f"Device: {current.get('device',{}).get('name','-')}")
+        st.write(f"Context: {current.get('context', {}).get('type','-')}")
     else:
-        st.markdown('<div class="small">Geen afspeelinformatie beschikbaar</div>', unsafe_allow_html=True)
-
-    # equalizer indicator (only visible when playing)
-    if is_playing:
-        st.markdown('<div style="margin-top:8px;"><span class="small">Now playing</span> <span class="equalizer"><div class="eq-bar eq-1" style="background:'+accent_hex+'"></div><div class="eq-bar eq-2" style="background:'+accent_hex+'"></div><div class="eq-bar eq-3" style="background:'+accent_hex+'"></div></span></div>', unsafe_allow_html=True)
-
-    # controls centered with spacing
-    c1, c2, c3 = st.columns([1,1,1])
-    with c1:
-        if st.button("⏮", key="prev"):
-            try: sp.previous_track()
-            except: st.warning("Fout bij vorige track")
-    with c2:
-        if st.button("⏯", key="playpause"):
-            try:
-                current_state = sp.current_playback()
-                if current_state and current_state.get("is_playing"):
-                    sp.pause_playback()
-                else:
-                    sp.start_playback()
-            except: st.warning("Fout bij play/pause")
-    with c3:
-        if st.button("⏭", key="next"):
-            try: sp.next_track()
-            except: st.warning("Fout bij volgende track")
-
+        st.info("Geen muziek aan het spelen of geen device actief.")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# -------------------- Ritten Page --------------------
-elif page == "Ritten":
-    st.markdown('<div class="rit-tile">', unsafe_allow_html=True)
-    st.markdown('<div style="display:flex;justify-content:space-between;align-items:center;">', unsafe_allow_html=True)
-    st.markdown('<h4 style="margin:0;">🏁 Rit Tracker</h4>', unsafe_allow_html=True)
+# --------- Tab 1: Ritten (start/stop, live) ----------
+with tabs[1]:
+    st.markdown('<div class="tab-block">', unsafe_allow_html=True)
+    st.header("🚴 Rit Tracker")
+    # start/stop
+    if not st.session_state["ride_active"]:
+        if st.button("▶️ Start rit"):
+            st.session_state["ride_active"] = True
+            st.session_state["ride_start_ts"] = time.time()
+            st.success("Rit gestart")
+    else:
+        # show live time
+        elapsed = time.time() - st.session_state["ride_start_ts"]
+        st.markdown(f"⏱️ Huidige rit: **{int(elapsed)} sec**")
+        if st.button("⏹ Stop rit"):
+            duration = time.time() - st.session_state["ride_start_ts"]
+            st.session_state["rides"].append({
+                "start": datetime.fromtimestamp(st.session_state["ride_start_ts"]).strftime("%Y-%m-%d %H:%M:%S"),
+                "end": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "sec": round(duration,1)
+            })
+            st.session_state["ride_active"] = False
+            st.session_state["ride_start_ts"] = None
+            st.success("Rit opgeslagen")
 
-    col_start, col_stop = st.columns([1,1])
-    with col_start:
-        if st.button("▶️ Start Rit", key="start"):
-            st.session_state.ride_start = datetime.now()
-            st.session_state.last_ride_id += 1
-    with col_stop:
-        if st.button("⏹ Stop Rit", key="stop"):
-            if "ride_start" in st.session_state:
-                end = datetime.now()
-                dur = (end - st.session_state.ride_start).total_seconds()
-                st.session_state.ride_log.append({
-                    "rit": st.session_state.last_ride_id,
-                    "start": st.session_state.ride_start.strftime('%Y-%m-%d %H:%M:%S'),
-                    "end": end.strftime('%Y-%m-%d %H:%M:%S'),
-                    "sec": round(dur,1)
-                })
-                del st.session_state.ride_start
-
-    if "ride_start" in st.session_state:
-        live = (datetime.now() - st.session_state.ride_start).total_seconds()
-        st.markdown(f'<div class="small">⏱️ Huidige rit: {round(live,1)} sec</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="progress-container"><div class="progress-bar" style="width:{min(live*2,100)}%; background:linear-gradient(90deg, #1DB954, #1ed760);"></div></div>', unsafe_allow_html=True)
-
-    df = pd.DataFrame(st.session_state.ride_log)
-    st.dataframe(df[['rit','start','end','sec']] if not df.empty else df, height=220)
-    csv = df.to_csv(index=False).encode("utf-8")
-    st.download_button("📥 Download CSV", csv, "ride_log.csv")
+    # show log
+    if st.session_state["rides"]:
+        df = pd.DataFrame(st.session_state["rides"])
+        st.dataframe(df, use_container_width=True, height=240)
+        csv = df.to_csv(index=False).encode("utf-8")
+        st.download_button("📥 Download CSV", csv, "ride_log.csv")
+    else:
+        st.info("Nog geen ritten gelogd.")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# -------------------- Dashboard Page --------------------
-elif page == "Dashboard":
-    st.markdown('<div class="dash-tile">', unsafe_allow_html=True)
-    st.subheader("📊 Rit Statistieken")
-    df = pd.DataFrame(st.session_state.ride_log)
+# --------- Tab 2: Statistieken ----------
+with tabs[2]:
+    st.markdown('<div class="tab-block">', unsafe_allow_html=True)
+    st.header("📊 Rit Statistieken")
+    df = pd.DataFrame(st.session_state["rides"])
     if not df.empty:
         total = len(df)
-        avg_sec = df['sec'].mean()
-        longest = df['sec'].max()
-        shortest = df['sec'].min()
-        total_time = df['sec'].sum()
+        avg_sec = df["sec"].mean()
+        longest = df["sec"].max()
+        total_time = df["sec"].sum()
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Totaal ritten", total)
+        c2.metric("Gem. duur", f"{round(avg_sec,1)} s")
+        c3.metric("Langste rit", f"{round(longest,1)} s")
+        c4.metric("Totale tijd", f"{round(total_time,1)} s")
 
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Totaal ritten", total)
-        col2.metric("Gem. duur", sec_to_hms(avg_sec))
-        col3.metric("Langste rit", sec_to_hms(longest))
-        col4.metric("Totale tijd", sec_to_hms(total_time))
-
-        # grafiek
-        fig = px.bar(df, x='rit', y='sec', labels={'sec':'Duur (s)', 'rit':'Rit #'}, color='sec', color_continuous_scale=['#1DB954','#1ed760'])
-        fig.update_layout(plot_bgcolor='#0d0d0d', paper_bgcolor='#0d0d0d', font_color='white', height=300, margin=dict(l=10,r=10,t=30,b=10))
+        # plot durations
+        fig = px.bar(df.reset_index().rename(columns={"index":"rit"}), x="rit", y="sec",
+                     labels={"sec":"Duur (s)", "rit":"Rit #"}, color="sec",
+                     color_continuous_scale=["#1DB954","#1ed760"])
+        fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="white", height=320)
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("Nog geen ritten. Start een rit om statistieken te verzamelen.")
+        st.info("Nog geen ritten om statistieken van te maken.")
     st.markdown('</div>', unsafe_allow_html=True)
+
+# --------- Tab 3: Instellingen ----------
+with tabs[3]:
+    st.markdown('<div class="tab-block">', unsafe_allow_html=True)
+    st.header("⚙️ Instellingen")
+    refresh = st.slider("Auto-refresh interval (sec) — affecteert hoe vaak je handmatig refrehs wilt doen", 3, 30, st.session_state["refresh_interval"])
+    st.session_state["refresh_interval"] = refresh
+    st.write("Huidige interval:", refresh, "s")
+    st.markdown("**Tip:** Streamlit draait in de browser — je kunt `st.experimental_rerun()` handmatig uitvoeren wanneer je snel update wil forceren.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# --------- Tab 4: Navigatie (OSM & OSRM, no API key) ----------
+with tabs[4]:
+    st.markdown('<div class="tab-block">', unsafe_allow_html=True)
+    st.header("🗺️ Navigatie (OpenStreetMap + OSRM) — geen API key")
+    st.write("Voer een adres of `lat,lon` in. We gebruiken Nominatim (OSM) voor geocoding en OSRM public router voor route & instructies.")
+    col1, col2 = st.columns(2)
+    with col1:
+        start_input = st.text_input("Start (adres or lat,lon)", "Amsterdam Centraal")
+    with col2:
+        end_input = st.text_input("Bestemming (adres or lat,lon)", "Rotterdam Centraal")
+    if st.button("📍 Bereken route"):
+        with st.spinner("Geocoding & route ophalen... (beleefd gebruik van OSM services)"):
+            s_coord = geocode_address(start_input)
+            time.sleep(0.8)  # be courteous
+            e_coord = geocode_address(end_input)
+
+            if not s_coord:
+                st.error("Kon startlocatie niet vinden. Probeer een ander adres of gebruik lat,lon.")
+            elif not e_coord:
+                st.error("Kon bestemming niet vinden. Probeer een ander adres of gebruik lat,lon.")
+            else:
+                lat1, lon1 = s_coord
+                lat2, lon2 = e_coord
+                route = osrm_route(lat1, lon1, lat2, lon2)
+                if not route:
+                    st.error("Kon geen route ophalen van OSRM (beperkt/af en toe niet beschikbaar). Probeer later of kies andere locaties.")
+                else:
+                    # show stats
+                    st.markdown(f"**Afstand:** {round(route['distance_m']/1000,2)} km — **Tijd:** {int(route['duration_s']//60)} min")
+                    # create folium map centered
+                    mid_lat = (lat1 + lat2) / 2
+                    mid_lon = (lon1 + lon2) / 2
+                    m = folium.Map(location=[mid_lat, mid_lon], zoom_start=12, tiles="CartoDB dark_matter")
+                    # add markers
+                    folium.Marker([lat1, lon1], tooltip="Start", icon=folium.Icon(color="lightgray", icon="play")).add_to(m)
+                    folium.Marker([lat2, lon2], tooltip="Bestemming", icon=folium.Icon(color="green", icon="flag")).add_to(m)
+                    # add route
+                    folium.GeoJson(route["geojson"], name="route",
+                                   style_function=lambda x: {"color":"#1DB954", "weight":6, "opacity":0.9}).add_to(m)
+                    # fit bounds if possible
+                    try:
+                        coords = route["geojson"]["coordinates"]
+                        lats = [pt[1] for pt in coords]
+                        lons = [pt[0] for pt in coords]
+                        m.fit_bounds([[min(lats), min(lons)], [max(lats), max(lons)]])
+                    except Exception:
+                        pass
+                    st.markdown('<div class="folium-container">', unsafe_allow_html=True)
+                    st_folium(m, width=920, height=470)
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+                    st.subheader("🚦 Turn-by-turn instructies")
+                    for i, step in enumerate(route["steps"], 1):
+                        st.markdown(f"**{i}.** {step['text']} — {int(step['distance_m'])} m")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# End of file
