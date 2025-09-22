@@ -1,7 +1,6 @@
 import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-import pandas as pd
 import requests
 from streamlit_folium import st_folium
 import folium
@@ -16,12 +15,12 @@ auth_manager = SpotifyOAuth(
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
     redirect_uri=REDIRECT_URI,
-    scope=SCOPE
+    scope=SCOPE,
+    cache_path=".spotifycache",  # zorgt dat je niet steeds hoeft in te loggen
 )
 sp = spotipy.Spotify(auth_manager=auth_manager)
 
-# --- Geocoding + Routing (met caching) ---
-@st.cache_data(ttl=3600)
+# --- Geocoding + Routing ---
 def geocode_location(place):
     """Geef coördinaten terug voor een adres via Nominatim (OSM)."""
     url = f"https://nominatim.openstreetmap.org/search?q={place}&format=json&limit=1"
@@ -31,7 +30,6 @@ def geocode_location(place):
         return None
     return float(data[0]["lat"]), float(data[0]["lon"])
 
-@st.cache_data(ttl=1800)
 def get_route(start_coords, end_coords):
     """Haal route op van OSRM tussen twee coördinaten."""
     url = (
@@ -50,8 +48,8 @@ def get_route(start_coords, end_coords):
             steps.append(step["maneuver"]["instruction"])
     return route, steps
 
-# --- UI Tabs ---
-tabs = st.tabs(["🎵 Spotify", "📊 Ritdata", "⚙️ Instellingen", "📈 Grafieken", "🗺️ Navigatie"])
+# --- Tabs ---
+tabs = st.tabs(["🎵 Spotify", "🗺️ Navigatie"])
 
 # --- Spotify Tab ---
 with tabs[0]:
@@ -62,7 +60,7 @@ with tabs[0]:
     except Exception:
         current = None
 
-    if current and current.get("is_playing"):
+    if current and current.get("item"):
         track = current["item"]["name"]
         artist = current["item"]["artists"][0]["name"]
         cover = current["item"]["album"]["images"][1]["url"]
@@ -84,41 +82,10 @@ with tabs[0]:
             if st.button("⏭️ Volgende"):
                 sp.next_track()
     else:
-        st.info("Geen muziek aan het spelen.")
-
-# --- Ritdata Tab ---
-with tabs[1]:
-    st.subheader("Ritten loggen")
-    if "ritten" not in st.session_state:
-        st.session_state["ritten"] = []
-
-    afstand = st.number_input("Afstand (km)", min_value=0.0, step=0.1)
-    tijd = st.text_input("Tijd (bijv. 45m of 1h15m)")
-
-    if st.button("➕ Rit toevoegen"):
-        st.session_state["ritten"].append({"Afstand (km)": afstand, "Tijd": tijd})
-        st.success("Rit toegevoegd!")
-
-    if st.session_state["ritten"]:
-        df = pd.DataFrame(st.session_state["ritten"])
-        st.table(df)
-
-# --- Instellingen Tab ---
-with tabs[2]:
-    st.subheader("Instellingen")
-    st.write("Hier kun je toekomstige instellingen plaatsen (bijv. thema, refresh-tijd).")
-
-# --- Grafieken Tab ---
-with tabs[3]:
-    st.subheader("Rit Grafieken (basis)")
-    if "ritten" in st.session_state and st.session_state["ritten"]:
-        df = pd.DataFrame(st.session_state["ritten"])
-        st.bar_chart(df["Afstand (km)"])
-    else:
-        st.info("Nog geen ritten om weer te geven.")
+        st.info("Geen muziek aan het spelen of geen device actief.")
 
 # --- Navigatie Tab ---
-with tabs[4]:
+with tabs[1]:
     st.subheader("Navigatie")
 
     col1, col2 = st.columns(2)
@@ -149,3 +116,4 @@ with tabs[4]:
                 st.error("Geen route gevonden.")
         else:
             st.error("Kon locaties niet vinden.")
+
