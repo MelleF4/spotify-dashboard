@@ -9,76 +9,43 @@ import folium
 CLIENT_ID = st.secrets["CLIENT_ID"]
 CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
 REDIRECT_URI = st.secrets["REDIRECT_URI"]
+
 SCOPE = "user-read-playback-state user-modify-playback-state"
 
-# login + tokenbeheer via Streamlit session
-if "token_info" not in st.session_state:
-    st.session_state.token_info = None
+# Auth manager
+sp_oauth = SpotifyOAuth(
+    client_id=CLIENT_ID,
+    client_secret=CLIENT_SECRET,
+    redirect_uri=REDIRECT_URI,
+    scope=SCOPE,
+    cache_path=".cache-spotify"
+)
 
-def get_spotify_client():
-    """Geef een ingelogde Spotify client terug, of None als nog niet ingelogd."""
-    auth_manager = SpotifyOAuth(
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET,
-        redirect_uri=REDIRECT_URI,
-        scope=SCOPE,
-        show_dialog=True,
-        cache_path=".spotifycache"
-    )
-    if st.session_state.token_info:
-        return spotipy.Spotify(auth=st.session_state.token_info["access_token"])
-    else:
-        return None
+# Probeer cached token te laden
+token_info = sp_oauth.get_cached_token()
+if not token_info:
+    # Nog niet ingelogd → geef loginlink
+    auth_url = sp_oauth.get_authorize_url()
+    st.write("🔑 [Login met Spotify](" + auth_url + ")")
+    redirect_url = st.text_input("Plak hier de volledige URL waar je na login heen werd gestuurd:")
 
-# --- OSM helpers ---
-def geocode_location(place):
-    url = f"https://nominatim.openstreetmap.org/search?q={place}&format=json&limit=1"
-    r = requests.get(url, headers={"User-Agent": "streamlit-spotify-dashboard"})
-    data = r.json()
-    if not data:
-        return None
-    return float(data[0]["lat"]), float(data[0]["lon"])
+    if redirect_url:
+        code = sp_oauth.parse_response_code(redirect_url)
+        token_info = sp_oauth.get_access_token(code, as_dict=True)
+else:
+    st.success("✅ Ingelogd met Spotify!")
 
-def get_route(start_coords, end_coords):
-    url = (
-        f"http://router.project-osrm.org/route/v1/driving/"
-        f"{start_coords[1]},{start_coords[0]};{end_coords[1]},{end_coords[0]}"
-        f"?overview=full&geometries=geojson&steps=true"
-    )
-    r = requests.get(url)
-    data = r.json()
-    if data.get("code") != "Ok":
-        return None, []
-    route = data["routes"][0]["geometry"]["coordinates"]
-    steps = []
-    for leg in data["routes"][0]["legs"]:
-        for step in leg["steps"]:
-            steps.append(step["maneuver"]["instruction"])
-    return route, steps
+sp = None
+if token_info:
+    sp = spotipy.Spotify(auth=token_info["access_token"])
 
 # --- Tabs ---
 tabs = st.tabs(["🎵 Spotify", "🗺️ Navigatie"])
 
-# --- Spotify Tab ---
+# --- Spotify Controls ---
 with tabs[0]:
     st.subheader("Spotify Controls")
-
-    auth_manager = SpotifyOAuth(
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET,
-        redirect_uri=REDIRECT_URI,
-        scope=SCOPE,
-        show_dialog=True,
-        cache_path=".spotifycache"
-    )
-
-    # login knop
-    if not st.session_state.token_info:
-        auth_url = auth_manager.get_authorize_url()
-        st.markdown(f"[👉 Login met Spotify]({auth_url})")
-    else:
-        sp = get_spotify_client()
-
+    if sp:
         try:
             current = sp.current_playback()
         except Exception:
@@ -107,10 +74,37 @@ with tabs[0]:
                     sp.next_track()
         else:
             st.info("Geen muziek aan het spelen of geen device actief.")
+    else:
+        st.warning("⚠️ Eerst inloggen met Spotify.")
 
 # --- Navigatie Tab ---
 with tabs[1]:
     st.subheader("Navigatie")
+
+    def geocode_location(place):
+        url = f"https://nominatim.openstreetmap.org/search?q={place}&format=json&limit=1"
+        r = requests.get(url, headers={"User-Agent": "streamlit-spotify-dashboard"})
+        data = r.json()
+        if not data:
+            return None
+        return float(data[0]["lat"]), float(data[0]["lon"])
+
+    def get_route(start_coords, end_coords):
+        url = (
+            f"http://router.project-osrm.org/route/v1/driving/"
+            f"{start_coords[1]},{start_coords[0]};{end_coords[1]},{end_coords[0]}"
+            f"?overview=full&geometries=geojson&steps=true"
+        )
+        r = requests.get(url)
+        data = r.json()
+        if data.get("code") != "Ok":
+            return None, []
+        route = data["routes"][0]["geometry"]["coordinates"]
+        steps = []
+        for leg in data["routes"][0]["legs"]:
+            for step in leg["steps"]:
+                steps.append(step["maneuver"]["instruction"])
+        return route, steps
 
     col1, col2 = st.columns(2)
     with col1:
