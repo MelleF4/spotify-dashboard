@@ -110,19 +110,25 @@ if st.session_state["token_info"]:
             if st.button("⏮️"): sp.previous_track()
         with col_b:
             if st.button("⏯️"):
-                if current["is_playing"]: sp.pause_playback()
+                if current and current.get("is_playing"): sp.pause_playback()
                 else: sp.start_playback()
         with col_c:
             if st.button("⏭️"): sp.next_track()
 
-        # Device + Volume
+        # Device + Volume (veilig)
         devices = sp.devices()["devices"]
         if devices:
             device_names = [d["name"] for d in devices]
             selected_device = st.selectbox("Device", device_names)
-            vol = st.slider("Volume", min_value=0, max_value=100, value=current["device"]["volume_percent"])
+            vol = st.slider("Volume", min_value=0, max_value=100, value=current["device"]["volume_percent"] if current else 50)
             device_id = [d["id"] for d in devices if d["name"]==selected_device][0]
-            sp.volume(vol, device_id=device_id)
+
+            # Alleen versturen als playback actief en device geldig
+            if current and current.get("device") and current["device"]["id"] == device_id:
+                try:
+                    sp.volume(vol, device_id=device_id)
+                except spotipy.exceptions.SpotifyException:
+                    st.warning("Kan volume niet aanpassen: controleer dat het apparaat actief is op Spotify Connect.")
         st.markdown('</div>', unsafe_allow_html=True)
 
         # Recently played
@@ -145,4 +151,3 @@ if st.session_state["token_info"]:
     # ===== Auto-refresh =====
     time.sleep(5)
     st.experimental_rerun()
-
