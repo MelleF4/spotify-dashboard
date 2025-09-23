@@ -4,6 +4,8 @@ from spotipy.oauth2 import SpotifyOAuth
 import requests
 import folium
 from streamlit_folium import st_folium
+from PIL import Image
+from io import BytesIO
 
 # =========================
 # Spotify instellingen
@@ -22,7 +24,7 @@ sp_oauth = SpotifyOAuth(
 )
 
 # =========================
-# Spotify login (handmatig)
+# Spotify login handmatig
 # =========================
 if "token_info" not in st.session_state:
     st.session_state["token_info"] = None
@@ -52,26 +54,29 @@ if st.session_state["token_info"]:
 
     sp = spotipy.Spotify(auth=token_info["access_token"])
 
-    # CarPlay-style tile
     st.set_page_config(page_title="CarPlay Dashboard", layout="wide")
     st.markdown(
         """
         <style>
-        .spotify-tile {
-            background-color: #121212;
-            border-radius: 20px;
-            padding: 15px;
-            text-align: center;
+        body {
+            background-color: #0d0d0d;
             color: white;
-            margin-bottom: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        .tile {
+            background-color: #121212;
+            border-radius: 25px;
+            padding: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
         }
         .spotify-logo {
-            width: 100px;
+            width: 120px;
             margin-bottom: 10px;
         }
         .track-info {
-            font-size: 18px;
-            font-weight: bold;
+            font-size: 20px;
+            font-weight: 600;
         }
         .artist-info {
             font-size: 14px;
@@ -81,19 +86,37 @@ if st.session_state["token_info"]:
             background-color: #1DB954;
             border: none;
             color: white;
-            padding: 10px 16px;
-            margin: 0 5px;
-            border-radius: 30px;
+            padding: 12px 20px;
+            margin: 0 10px;
+            border-radius: 50px;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 18px;
+            transition: all 0.2s ease-in-out;
+        }
+        .controls button:hover {
+            transform: scale(1.2);
+            box-shadow: 0 0 10px #1DB954;
+        }
+        .cover-glow {
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(29,185,84,0.7);
+        }
+        .map-tile {
+            background-color: #121212;
+            border-radius: 25px;
+            padding: 15px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
         }
         </style>
         """,
         unsafe_allow_html=True
     )
 
+    # =========================
+    # Spotify tile
+    # =========================
     with st.container():
-        st.markdown('<div class="spotify-tile">', unsafe_allow_html=True)
+        st.markdown('<div class="tile" style="text-align:center;">', unsafe_allow_html=True)
         st.image("https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_White.png", width=120)
 
         current = sp.current_playback()
@@ -102,11 +125,14 @@ if st.session_state["token_info"]:
             artist = ", ".join([a["name"] for a in current["item"]["artists"]])
             cover = current["item"]["album"]["images"][1]["url"]
 
-            st.image(cover, width=150)
+            response = requests.get(cover)
+            img = Image.open(BytesIO(response.content))
+            st.image(img, width=140, use_column_width=False, clamp=True, output_format="PNG", caption=None)
+
             st.markdown(f"<div class='track-info'>{track}</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='artist-info'>{artist}</div>", unsafe_allow_html=True)
 
-            col1, col2, col3 = st.columns([1, 1, 1])
+            col1, col2, col3 = st.columns([1,1,1])
             with col1:
                 if st.button("⏮️"):
                     sp.previous_track()
@@ -127,6 +153,7 @@ if st.session_state["token_info"]:
     # =========================
     # Navigatie kaart
     # =========================
+    st.markdown('<div class="map-tile">', unsafe_allow_html=True)
     st.markdown("### Navigatie")
 
     start_coords = [52.3676, 4.9041]  # Amsterdam
@@ -146,12 +173,13 @@ if st.session_state["token_info"]:
     route_data = get_route(start_coords, end_coords)
     if route_data:
         coords = route_data["features"][0]["geometry"]["coordinates"]
-        m = folium.Map(location=start_coords, zoom_start=9)
+        m = folium.Map(location=start_coords, zoom_start=9, tiles="CartoDB dark_matter")
         folium.Marker(start_coords, tooltip="Start").add_to(m)
         folium.Marker(end_coords, tooltip="Eind").add_to(m)
-        folium.PolyLine([[lat, lon] for lon, lat in coords], color="blue").add_to(m)
+        folium.PolyLine([[lat, lon] for lon, lat in coords], color="#1DB954", weight=5).add_to(m)
         st_folium(m, width=700, height=400)
     else:
         st.warning("Kon geen route ophalen. Controleer ORS_API_KEY of netwerk.")
 
+    st.markdown('</div>', unsafe_allow_html=True)
 
