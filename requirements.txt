@@ -3,3 +3,4 @@ spotipy
 Pillow
 numpy
 requests
+streamlit-autorefresh
