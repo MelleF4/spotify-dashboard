@@ -93,24 +93,24 @@ def main():
     # =========================
     st.markdown("""
     <style>
-    /* Algemene stijl */
+    /* Algemene stijl - Lichte modus */
     body { 
-        background-color: #000; 
+        background-color: #f0f0f5; 
         font-family: -apple-system,BlinkMacSystemFont,sans-serif; 
-        color: white; 
+        color: black; 
         margin: 0; 
         padding: 0; 
     }
     
-    /* Glazen tegel effect */
+    /* Glazen tegel effect voor lichte modus */
     .glass-tile { 
-        background: rgba(30,30,30,0.6); 
+        background: rgba(255,255,255,0.7); 
         backdrop-filter: blur(40px); 
         border-radius: 25px; 
         padding: 20px; 
         margin: 10px 0; 
-        box-shadow: 0 15px 35px rgba(0,0,0,0.8); 
-        border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1); 
+        border: 1px solid rgba(0,0,0,0.1);
         width: 100%;
         max-width: 600px;
         overflow: hidden;
@@ -122,14 +122,14 @@ def main():
         bottom: 0;
         left: 0;
         width: 100%;
-        background: rgba(30,30,30,0.6); 
+        background: rgba(255,255,255,0.7); 
         backdrop-filter: blur(40px);
         display: flex;
         align-items: center;
         padding: 15px;
         border-top-left-radius: 25px;
         border-top-right-radius: 25px;
-        box-shadow: 0 -5px 25px rgba(0,0,0,0.8);
+        box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
         z-index: 100;
         gap: 15px;
     }
@@ -148,13 +148,14 @@ def main():
     .track-info-small {
         font-size: 16px; 
         font-weight: 700;
+        color: #222;
         white-space: nowrap; 
         overflow: hidden; 
         text-overflow: ellipsis; 
     }
     .artist-info-small {
         font-size: 14px; 
-        color: #b3b3b3; 
+        color: #666; 
         white-space: nowrap; 
         overflow: hidden; 
         text-overflow: ellipsis;
@@ -181,7 +182,7 @@ def main():
         background-position: center;
         color: transparent !important;
     }
-    .controls-container button:hover { background-color: rgba(255,255,255,0.1); }
+    .controls-container button:hover { background-color: rgba(0,0,0,0.05); }
     .controls-container button:active { transform: scale(0.95); }
     
     .stButton > button[kind="secondary"] {
@@ -193,7 +194,7 @@ def main():
         margin: auto;
     }
     .stButton > button[kind="secondary"]:hover {
-        background-color: rgba(255,255,255,0.1);
+        background-color: rgba(0,0,0,0.05);
     }
     .stButton > button[kind="secondary"]:active {
         transform: scale(0.95);
@@ -208,28 +209,28 @@ def main():
         background-color: #1ed760 !important;
     }
     
-    /* Vorige knop SVG */
+    /* Vorige knop SVG (nu zwart) */
     .prev-btn > button {
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M6 6h2v12H6zm3.5 6l8.5 6V6z'/%3E%3C/svg%3E");
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M6 6h2v12H6zm3.5 6l8.5 6V6z'/%3E%3C/svg%3E");
     }
 
-    /* Volgende knop SVG */
+    /* Volgende knop SVG (nu zwart) */
     .next-btn > button {
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M16 18h2V6h-2zM6 18V6l8.5 6z'/%3E%3C/svg%3E");
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M16 18h2V6h-2zM6 18V6l8.5 6z'/%3E%3C/svg%3E");
     }
 
-    /* Pauze knop SVG */
+    /* Pauze knop SVG (nu zwart) */
     .pause-btn > button {
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M6 19h4V5H6v14zm8-14v14h4V5h-4z'/%3E%3C/svg%3E");
     }
 
-    /* Play knop SVG */
+    /* Play knop SVG (nu zwart) */
     .play-btn > button {
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M8 5v14l11-7z'/%3E%3C/svg%3E");
     }
 
     /* Algemene lay-out aanpassingen */
-    .stApp { background-color: #000; }
+    .stApp { background-color: #f0f0f5; }
     .main-container {
         display: flex;
         flex-direction: column;
@@ -251,8 +252,8 @@ def main():
         border-radius: 25px;
         overflow: hidden;
         margin-bottom: 20px;
-        box-shadow: 0 15px 35px rgba(0,0,0,0.8);
-        border: 1px solid rgba(255,255,255,0.1);
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        border: 1px solid rgba(0,0,0,0.1);
     }
     .map-container iframe {
         border-radius: 25px;
