@@ -1,9 +1,6 @@
 streamlit
 spotipy
-pandas
 requests
-Pillow
-colorthief
+polyline
 folium
 streamlit-folium
-plotly
