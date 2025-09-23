@@ -2,9 +2,8 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import requests
-from PIL import Image, ImageFilter
+from PIL import Image
 from io import BytesIO
-import numpy as np
 from streamlit_autorefresh import st_autorefresh
 
 # =========================
@@ -83,81 +82,154 @@ def main():
     st.markdown("""
     <style>
     /* Algemene stijl */
-    body { background: #000; font-family: -apple-system,BlinkMacSystemFont,sans-serif; color: white; margin: 0; padding: 0; }
+    body { 
+        background-color: #000; 
+        font-family: -apple-system,BlinkMacSystemFont,sans-serif; 
+        color: white; 
+        margin: 0; 
+        padding: 0; 
+    }
     
     /* Glazen tegel effect */
     .glass-tile { 
-        background: rgba(20,20,20,0.6); 
-        backdrop-filter: blur(25px); 
-        border-radius: 20px; 
-        padding: 15px; 
-        margin: 5px; 
-        box-shadow: 0 5px 20px rgba(0,0,0,0.5); 
+        background: rgba(30,30,30,0.6); 
+        backdrop-filter: blur(40px); 
+        border-radius: 25px; 
+        padding: 20px; 
+        margin: 10px 0; 
+        box-shadow: 0 15px 35px rgba(0,0,0,0.8); 
         border: 1px solid rgba(255,255,255,0.1);
         width: 100%;
+        max-width: 600px;
         overflow: hidden;
     }
 
     /* Hoes en info */
-    .album-art-container { text-align: center; }
-    .album-art { border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.7); }
-    .track-info { font-size: 20px; font-weight: 700; margin-top: 10px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .artist-info { font-size: 14px; color: #b3b3b3; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .album-art-container { text-align: center; position: relative; }
+    .album-art { 
+        border-radius: 20px; 
+        box-shadow: 0 10px 30px rgba(0,0,0,0.7); 
+        transition: transform 0.3s;
+    }
+    .album-art-glow {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        filter: blur(40px);
+        z-index: -1;
+        background-size: cover;
+        opacity: 0.8;
+        border-radius: 20px;
+    }
+    .track-info { 
+        font-size: 24px; 
+        font-weight: 700; 
+        margin-top: 20px; 
+        text-align: center; 
+        white-space: nowrap; 
+        overflow: hidden; 
+        text-overflow: ellipsis; 
+    }
+    .artist-info { 
+        font-size: 16px; 
+        color: #b3b3b3; 
+        text-align: center; 
+        white-space: nowrap; 
+        overflow: hidden; 
+        text-overflow: ellipsis; 
+    }
 
     /* Voortgangsbalk */
-    .progress-bar-container { background: rgba(255,255,255,0.1); border-radius: 8px; width: 100%; height: 5px; margin: 15px 0 10px; }
-    .progress-bar { background: #1DB954; height: 100%; border-radius: 8px; transition: width 0.5s; }
+    .progress-bar-container { 
+        background: rgba(255,255,255,0.1); 
+        border-radius: 8px; 
+        width: 100%; 
+        height: 6px; 
+        margin: 20px 0 15px; 
+        position: relative;
+    }
+    .progress-bar { 
+        background: #1DB954; 
+        height: 100%; 
+        border-radius: 8px; 
+        transition: width 0.5s linear; 
+    }
+    .progress-bar-thumb {
+        position: absolute;
+        right: 0;
+        top: 50%;
+        transform: translate(50%, -50%);
+        width: 12px;
+        height: 12px;
+        background-color: #fff;
+        border-radius: 50%;
+        box-shadow: 0 0 10px #1DB954;
+    }
 
     /* Bedieningselementen */
-    .controls-container { text-align: center; display: flex; justify-content: space-around; padding: 10px; }
+    .controls-container { 
+        text-align: center; 
+        display: flex; 
+        justify-content: space-around; 
+        padding: 10px; 
+        gap: 20px;
+    }
     .controls-container button { 
         background-color: transparent; 
         border: none; 
-        color: white; 
-        width: 60px;
-        height: 60px;
+        width: 70px;
+        height: 70px;
         border-radius: 50%; 
         cursor: pointer; 
-        transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s;
+        transition: background-color 0.2s, transform 0.2s;
         display: flex;
         align-items: center;
         justify-content: center;
     }
     .controls-container button:hover { background-color: rgba(255,255,255,0.1); }
-    .controls-container button:active { transform: scale(0.95); box-shadow: inset 0 0 10px rgba(0,0,0,0.3); }
-    .controls-container button.play-button { background-color: #1DB954; }
-    .controls-container button.play-button:hover { background-color: #1ed760; }
-    .controls-container button.play-button:active { transform: scale(0.95); box-shadow: inset 0 0 10px rgba(0,0,0,0.3); }
+    .controls-container button:active { transform: scale(0.95); }
+    .play-button { 
+        background-color: #1DB954 !important; 
+        box-shadow: 0 0 20px rgba(29, 185, 84, 0.5);
+    }
+    .play-button:hover { background-color: #1ed760 !important; }
 
     /* SVG icon styling */
-    .icon { width: 24px; height: 24px; fill: white; }
+    .icon { width: 32px; height: 32px; fill: white; }
     .icon-play { fill: black; }
 
     /* Recent afgespeeld sectie */
     .recent-header { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
-    .scrolling-tiles { display: flex; overflow-x: scroll; padding: 5px; -webkit-overflow-scrolling: touch; }
+    .scrolling-tiles { 
+        display: flex; 
+        overflow-x: scroll; 
+        padding: 5px; 
+        -webkit-overflow-scrolling: touch; 
+        gap: 15px;
+    }
     .scrolling-tiles::-webkit-scrollbar { display: none; }
     .scrolling-tiles div { 
-        margin-right: 15px; 
         flex: 0 0 auto; 
         text-align: center; 
-        font-size: 10px; 
-        width: 80px;
+        width: 100px;
     }
-    .scrolling-tiles img { border-radius: 10px; width: 80px; height: 80px; object-fit: cover; }
+    .scrolling-tiles img { border-radius: 12px; width: 100px; height: 100px; object-fit: cover; }
     .recent-track-name { 
         white-space: nowrap; 
         overflow: hidden; 
         text-overflow: ellipsis; 
         color: #b3b3b3; 
-        font-size: 11px;
+        font-size: 12px;
+        margin-top: 5px;
     }
     .recent-artist-name { 
         white-space: nowrap; 
         overflow: hidden; 
         text-overflow: ellipsis; 
         color: #777; 
-        font-size: 10px;
+        font-size: 11px;
     }
 
     /* Logout knop */
@@ -165,7 +237,7 @@ def main():
         background-color: rgba(255, 92, 92, 0.7); 
         border: none; 
         color: white; 
-        padding: 5px 10px; 
+        padding: 8px 15px; 
         border-radius: 10px; 
         cursor: pointer; 
         font-size: 12px; 
@@ -180,21 +252,12 @@ def main():
     .main-container {
         display: flex;
         flex-direction: column;
-        justify-content: center;
         align-items: center;
-        height: 100vh;
         width: 100%;
         padding: 20px;
         box-sizing: border-box;
-    }
-    .music-player-card {
-        width: 100%;
-        max-width: 600px;
-        margin-bottom: 20px;
-    }
-    .recent-played-card {
-        width: 100%;
-        max-width: 600px;
+        height: 100vh;
+        overflow-y: auto;
     }
     .login-prompt {
         text-align: center;
@@ -208,15 +271,15 @@ def main():
     if not sp:
         handle_login()
     else:
-        # Toon logout knop
+        st.markdown('<div class="main-container">', unsafe_allow_html=True)
+        
+        # Logout knop
         if st.button("Log uit", key="logout_btn", help="Klik om uit te loggen en de cache te wissen"):
             st.session_state.clear()
             st.rerun()
 
-        st.markdown('<div class="main-container">', unsafe_allow_html=True)
-        
         # Muziekspeler sectie
-        st.markdown('<div class="glass-tile music-player-card">', unsafe_allow_html=True)
+        st.markdown('<div class="glass-tile">', unsafe_allow_html=True)
         try:
             current = sp.current_playback()
             
@@ -228,10 +291,12 @@ def main():
                 try:
                     response = requests.get(cover_url, timeout=5)
                     response.raise_for_status()
-                    img = Image.open(BytesIO(response.content))
+                    img_bytes = BytesIO(response.content)
                     
-                    st.columns(3)[1].image(img, width=250, output_format="PNG", caption="")
-                    
+                    st.markdown("<div class='album-art-container'>", unsafe_allow_html=True)
+                    st.image(img_bytes, width=280, output_format="PNG", caption="")
+                    st.markdown("</div>", unsafe_allow_html=True)
+
                     st.markdown(f"<div class='track-info'>{track}</div>", unsafe_allow_html=True)
                     st.markdown(f"<div class='artist-info'>{artist}</div>", unsafe_allow_html=True)
 
@@ -243,21 +308,28 @@ def main():
                         st.markdown(f"""
                             <div class='progress-bar-container'>
                                 <div class='progress-bar' style='width:{pct}%;'></div>
+                                <div class='progress-bar-thumb' style='left:{pct}%;'></div>
                             </div>
                         """, unsafe_allow_html=True)
 
-                    # Bedieningsknoppen
+                    # Bedieningsknoppen met SVG
+                    st.markdown('<div class="controls-container">', unsafe_allow_html=True)
                     col_a, col_b, col_c = st.columns([1, 1, 1])
                     with col_a:
-                        if st.button("<<", key="prev_btn"): sp.previous_track()
+                        if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 13.5v-7l5 3.5-5 3.5z"/></svg>', key="prev_btn", unsafe_allow_html=True): 
+                            sp.previous_track()
                     with col_b:
-                        if st.button(">", key="play_pause_btn"):
-                            if current and current.get("is_playing"):
+                        if current.get("is_playing"):
+                            if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-play" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>', key="play_pause_btn", unsafe_allow_html=True):
                                 sp.pause_playback()
-                            else:
+                        else:
+                            if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>', key="play_pause_btn", unsafe_allow_html=True):
                                 sp.start_playback()
                     with col_c:
-                        if st.button(">>", key="next_btn"): sp.next_track()
+                        if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 13.5v-7l5 3.5-5 3.5z"/></svg>', key="next_btn", unsafe_allow_html=True):
+                            sp.next_track()
+                    st.markdown('</div>', unsafe_allow_html=True)
+
                 except (requests.exceptions.RequestException, IOError) as e:
                     st.error(f"Fout bij het ophalen van de albumhoes: {e}")
             else:
@@ -265,11 +337,11 @@ def main():
                 st.markdown('<div class="controls-container">', unsafe_allow_html=True)
                 col_a, col_b, col_c = st.columns([1, 1, 1])
                 with col_a:
-                    st.button("<<", key="prev_btn", disabled=True)
+                    st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 13.5v-7l5 3.5-5 3.5z"/></svg>', key="prev_btn", disabled=True, unsafe_allow_html=True)
                 with col_b:
-                    st.button(">", key="play_pause_btn")
+                    st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>', key="play_pause_btn", unsafe_allow_html=True)
                 with col_c:
-                    st.button(">>", key="next_btn", disabled=True)
+                    st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 13.5v-7l5 3.5-5 3.5z"/></svg>', key="next_btn", disabled=True, unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
 
         except Exception as e:
@@ -277,7 +349,7 @@ def main():
         st.markdown('</div>', unsafe_allow_html=True)
 
         # Recent afgespeeld sectie
-        st.markdown('<div class="glass-tile recent-played-card">', unsafe_allow_html=True)
+        st.markdown('<div class="glass-tile">', unsafe_allow_html=True)
         st.markdown('<div class="recent-header">Recent afgespeeld</div>', unsafe_allow_html=True)
         try:
             recent = sp.current_user_recently_played(limit=6)
@@ -290,7 +362,7 @@ def main():
                         cover_url = item["track"]["album"]["images"][2]["url"]
                         st.markdown(f"""
                             <div>
-                            <img src="{cover_url}" width="80" class="album-art"><br>
+                            <img src="{cover_url}" width="100" class="album-art"><br>
                             <span class="recent-track-name">{t_name}</span><br>
                             <span class="recent-artist-name">{a_name}</span>
                             </div>
