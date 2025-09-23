@@ -41,9 +41,18 @@ def handle_login():
     if "token_info" not in st.session_state or not st.session_state["token_info"]:
         sp_oauth = get_spotify_oauth()
         auth_url = sp_oauth.get_authorize_url()
+        
         st.markdown("<div class='login-prompt'>", unsafe_allow_html=True)
+        st.markdown("""
+            <div style="text-align: center; margin-bottom: 30px;">
+                <svg viewBox="0 0 167.5 167.5" xmlns="http://www.w3.org/2000/svg" style="width: 80px; height: 80px;">
+                    <title>Spotify Logo</title>
+                    <path fill="#1DB954" d="M83.75 0C37.5 0 0 37.5 0 83.75c0 46.25 37.5 83.75 83.75 83.75 46.25 0 83.75-37.5 83.75-83.75C167.5 37.5 130 0 83.75 0zm37.5 120.5c-2.5 4.5-8.5 6-13 3.5-16-9.5-35.5-11.5-56.5-6.5-5.5 1.5-11.5-1.5-13-7s1.5-11.5 7-13c24.5-6 48.5-3.5 67 8.5 4.5 2.5 5.5 8.5 3 13zm8.5-23.5c-3 5-10 6.5-15 3.5-19.5-12-49.5-15.5-67.5-10.5-6.5 1.5-13.5-2-15-8.5-1.5-6.5 2-13.5 8.5-15 23-6.5 57.5-2.5 80 14 5.5 3 7 10 3.5 15zm0-23.5c-3-5.5-11.5-7.5-17.5-4-26 15.5-65 15-88.5-7.5-5.5-5.5-5.5-14.5 0-20 5.5-5.5 14.5-5.5 20 0 25 24 64 24.5 85 9.5 5-3.5 7-11.5 3.5-17z"/>
+                </svg>
+            </div>
+        """, unsafe_allow_html=True)
         st.markdown("### 1️⃣ Log in bij Spotify")
-        st.markdown(f"[Klik hier om in te loggen bij Spotify]({auth_url})")
+        st.markdown(f"[Klik hier om in te loggen bij Spotify]({auth_url})", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
         
         st.markdown("<div class='login-prompt'>", unsafe_allow_html=True)
@@ -316,17 +325,17 @@ def main():
                     st.markdown('<div class="controls-container">', unsafe_allow_html=True)
                     col_a, col_b, col_c = st.columns([1, 1, 1])
                     with col_a:
-                        if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 13.5v-7l5 3.5-5 3.5z"/></svg>', key="prev_btn", unsafe_allow_html=True): 
+                        if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M11 6c.55 0 1 .45 1 1v10c0 .55-.45 1-1 1s-1-.45-1-1V7c0-.55.45-1 1-1zm6-1c.55 0 1 .45 1 1v12c0 .55-.45 1-1 1s-1-.45-1-1V6c0-.55.45-1 1-1zm-3-2c-5.52 0-10 4.48-10 10s4.48 10 10 10 10-4.48 10-10-4.48-10-10-10zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>', key="prev_btn", unsafe_allow_html=True): 
                             sp.previous_track()
                     with col_b:
                         if current.get("is_playing"):
-                            if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-play" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>', key="play_pause_btn", unsafe_allow_html=True):
+                            if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5V7.5l7 4.5-7 4.5z"/></svg>', key="play_pause_btn", unsafe_allow_html=True):
                                 sp.pause_playback()
                         else:
-                            if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>', key="play_pause_btn", unsafe_allow_html=True):
+                            if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon play-button" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5V7.5l7 4.5-7 4.5z"/></svg>', key="play_pause_btn", unsafe_allow_html=True):
                                 sp.start_playback()
                     with col_c:
-                        if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 13.5v-7l5 3.5-5 3.5z"/></svg>', key="next_btn", unsafe_allow_html=True):
+                        if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M6 18c-.55 0-1 .45-1 1s.45 1 1 1h12c.55 0 1-.45 1-1s-.45-1-1-1H6zm11-12h-4v12h4V6zm-6 0H6v12h4V6z"/></svg>', key="next_btn", unsafe_allow_html=True):
                             sp.next_track()
                     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -337,11 +346,11 @@ def main():
                 st.markdown('<div class="controls-container">', unsafe_allow_html=True)
                 col_a, col_b, col_c = st.columns([1, 1, 1])
                 with col_a:
-                    st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 13.5v-7l5 3.5-5 3.5z"/></svg>', key="prev_btn", disabled=True, unsafe_allow_html=True)
+                    st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M11 6c.55 0 1 .45 1 1v10c0 .55-.45 1-1 1s-1-.45-1-1V7c0-.55.45-1 1-1zm6-1c.55 0 1 .45 1 1v12c0 .55-.45 1-1 1s-1-.45-1-1V6c0-.55.45-1 1-1zm-3-2c-5.52 0-10 4.48-10 10s4.48 10 10 10 10-4.48 10-10-4.48-10-10-10zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>', key="prev_btn", disabled=True, unsafe_allow_html=True)
                 with col_b:
-                    st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>', key="play_pause_btn", unsafe_allow_html=True)
+                    st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon play-button" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5V7.5l7 4.5-7 4.5z"/></svg>', key="play_pause_btn", unsafe_allow_html=True)
                 with col_c:
-                    st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 13.5v-7l5 3.5-5 3.5z"/></svg>', key="next_btn", disabled=True, unsafe_allow_html=True)
+                    st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M6 18c-.55 0-1 .45-1 1s.45 1 1 1h12c.55 0 1-.45 1-1s-.45-1-1-1H6zm11-12h-4v12h4V6zm-6 0H6v12h4V6z"/></svg>', key="next_btn", disabled=True, unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
 
         except Exception as e:
