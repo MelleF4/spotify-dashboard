@@ -10,9 +10,9 @@ import time
 # =========================
 # Spotify instellingen via st.secrets
 # =========================
-CLIENT_ID = st.secrets["spotify"]["client_id"]
-CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
-REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
+CLIENT_ID = st.secrets["CLIENT_ID"]
+CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
+REDIRECT_URI = st.secrets["REDIRECT_URI"]
 SCOPE = "user-read-playback-state,user-read-currently-playing,user-read-recently-played,user-top-read"
 
 sp_oauth = SpotifyOAuth(
@@ -195,4 +195,5 @@ if st.session_state["token_info"]:
     # =========================
     time.sleep(5)
     st.experimental_rerun()
+
 
