@@ -171,51 +171,62 @@ def main():
         st.markdown('<div class="glass-tile">', unsafe_allow_html=True)
         try:
             current = sp.current_playback()
+            
             if current and current.get("item"):
                 track = current["item"]["name"]
                 artist = ", ".join([a["name"] for a in current["item"]["artists"]])
                 cover_url = current["item"]["album"]["images"][0]["url"]
                 
-                response = requests.get(cover_url)
-                response.raise_for_status()
-                
-                img = Image.open(BytesIO(response.content))
-                
-                col_left, col_right = st.columns([1, 1])
+                # Probeer albumhoes te downloaden, met foutafhandeling
+                try:
+                    response = requests.get(cover_url, timeout=5)
+                    response.raise_for_status()
+                    img = Image.open(BytesIO(response.content))
+                    
+                    col_left, col_right = st.columns([1, 1])
+                    with col_left:
+                        st.image(img, width=200, output_format="PNG", caption="")
+                    
+                    with col_right:
+                        st.markdown(f"<div class='track-info'>{track}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='artist-info'>{artist}</div>", unsafe_allow_html=True)
 
-                with col_left:
-                    st.image(img, width=200, output_format="PNG", caption=f"")
-                
-                with col_right:
-                    st.markdown(f"<div class='track-info'>{track}</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='artist-info'>{artist}</div>", unsafe_allow_html=True)
+                        # Voortgangsbalk
+                        duration = current["item"]["duration_ms"]
+                        progress = current["progress_ms"]
+                        pct = int((progress / duration) * 100)
+                        st.markdown(f"""
+                            <div class='progress-bar-container'>
+                                <div class='progress-bar' style='width:{pct}%;'></div>
+                            </div>
+                        """, unsafe_allow_html=True)
 
-                    # Voortgangsbalk
-                    duration = current["item"]["duration_ms"]
-                    progress = current["progress_ms"]
-                    pct = int((progress / duration) * 100)
-                    st.markdown(f"""
-                        <div class='progress-bar-container'>
-                            <div class='progress-bar' style='width:{pct}%;'></div>
-                        </div>
-                    """, unsafe_allow_html=True)
-
-                    # Bedieningsknoppen
-                    col_a, col_b, col_c = st.columns([1, 1, 1])
-                    with col_a:
-                        if st.button("⏮️", key="prev_btn"): sp.previous_track()
-                    with col_b:
-                        if st.button("⏯️", key="play_pause_btn"):
-                            if current and current["is_playing"]:
-                                sp.pause_playback()
-                            else:
-                                sp.start_playback()
-                    with col_c:
-                        if st.button("⏭️", key="next_btn"): sp.next_track()
+                        # Bedieningsknoppen
+                        col_a, col_b, col_c = st.columns([1, 1, 1])
+                        with col_a:
+                            if st.button("⏮️", key="prev_btn"): sp.previous_track()
+                        with col_b:
+                            if st.button("⏯️", key="play_pause_btn"):
+                                if current and current.get("is_playing"):
+                                    sp.pause_playback()
+                                else:
+                                    sp.start_playback()
+                        with col_c:
+                            if st.button("⏭️", key="next_btn"): sp.next_track()
+                except (requests.exceptions.RequestException, IOError) as e:
+                    st.error(f"Fout bij het ophalen van de albumhoes: {e}")
             else:
                 st.write("Er wordt momenteel geen muziek afgespeeld.")
-        except requests.exceptions.RequestException as e:
-            st.error(f"Fout bij het ophalen van de albumhoes: {e}")
+                st.markdown('<div class="controls-container">', unsafe_allow_html=True)
+                col_a, col_b, col_c = st.columns([1, 1, 1])
+                with col_a:
+                    st.button("⏮️", key="prev_btn", disabled=True)
+                with col_b:
+                    st.button("⏯️", key="play_pause_btn")
+                with col_c:
+                    st.button("⏭️", key="next_btn", disabled=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+
         except Exception as e:
             st.error(f"Er is een onverwachte fout opgetreden: {e}")
         st.markdown('</div>', unsafe_allow_html=True)
@@ -225,19 +236,20 @@ def main():
         # Recent afgespeeld
         try:
             recent = sp.current_user_recently_played(limit=6)
-            st.markdown("<div class='scrolling-tiles'>", unsafe_allow_html=True)
-            for item in recent["items"]:
-                t_name = item["track"]["name"]
-                a_name = ", ".join([a["name"] for a in item["track"]["artists"]])
-                cover_url = item["track"]["album"]["images"][2]["url"]
-                st.markdown(f"""
-                    <div>
-                    <img src="{cover_url}" width="80" class="album-art"><br>
-                    <span class="recent-track-name">{t_name}</span><br>
-                    <span class="recent-artist-name">{a_name}</span>
-                    </div>
-                """, unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+            if recent and "items" in recent:
+                st.markdown("<div class='scrolling-tiles'>", unsafe_allow_html=True)
+                for item in recent["items"]:
+                    t_name = item["track"]["name"]
+                    a_name = ", ".join([a["name"] for a in item["track"]["artists"]])
+                    cover_url = item["track"]["album"]["images"][2]["url"]
+                    st.markdown(f"""
+                        <div>
+                        <img src="{cover_url}" width="80" class="album-art"><br>
+                        <span class="recent-track-name">{t_name}</span><br>
+                        <span class="recent-artist-name">{a_name}</span>
+                        </div>
+                    """, unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
         except Exception as e:
             st.error(f"Fout bij het ophalen van recent afgespeelde nummers: {e}")
         st.markdown('</div>', unsafe_allow_html=True)
