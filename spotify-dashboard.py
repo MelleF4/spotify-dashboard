@@ -2,98 +2,112 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import requests
-import polyline
 import folium
 from streamlit_folium import st_folium
 
-# ========================
-# Spotify instellingen
-# ========================
+# =========================
+# Spotify Config
+# =========================
 CLIENT_ID = st.secrets["CLIENT_ID"]
 CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
 REDIRECT_URI = st.secrets["REDIRECT_URI"]
 
-SCOPE = "user-read-playback-state,user-modify-playback-state"
+SCOPE = "user-read-playback-state,user-modify-playback-state,user-read-currently-playing"
 
-# Spotify authenticatie
 sp_oauth = SpotifyOAuth(
     client_id=CLIENT_ID,
     client_secret=CLIENT_SECRET,
     redirect_uri=REDIRECT_URI,
-    scope=SCOPE
+    scope=SCOPE,
+    cache_path=".spotifycache"  # zorgt dat login onthouden wordt
 )
 
+# =========================
+# Spotify Auth Flow
+# =========================
 if "token_info" not in st.session_state:
-    auth_url = sp_oauth.get_authorize_url()
-    st.write("### Stap 1: Log in bij Spotify")
-    st.markdown(f"[Klik hier om in te loggen bij Spotify]({auth_url})")
+    st.session_state["token_info"] = None
 
-    code = st.text_input("### Stap 2: Plak hier de code uit de URL na inloggen")
+auth_url = sp_oauth.get_authorize_url()
+query_params = st.experimental_get_query_params()
 
-    if code:
-        token_info = sp_oauth.get_access_token(code)
-        st.session_state["token_info"] = token_info
-        st.experimental_rerun()
+if "code" in query_params and st.session_state["token_info"] is None:
+    code = query_params["code"][0]
+    token_info = sp_oauth.get_access_token(code, as_dict=True)
+    st.session_state["token_info"] = token_info
+    st.experimental_rerun()
 
-# ========================
-# Spotify dashboard
-# ========================
-if "token_info" in st.session_state:
-    token_info = st.session_state["token_info"]
-    sp = spotipy.Spotify(auth=token_info["access_token"])
+if st.session_state["token_info"] is None:
+    st.markdown(f"[Log in met Spotify]({auth_url})")
+    st.stop()
 
-    st.markdown(
-        """
-        <style>
-        body { background-color: black; }
-        .carplay-card {
-            background-color: #121212;
-            border-radius: 20px;
-            padding: 20px;
-            color: white;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .spotify-logo {
-            width: 60px;
-            margin-bottom: 15px;
-        }
-        .song-title {
-            font-size: 22px;
-            font-weight: bold;
-        }
-        .song-artist {
-            font-size: 18px;
-            color: #b3b3b3;
-        }
-        .controls button {
-            margin: 0 15px;
-            background: none;
-            border: none;
-            color: white;
-            font-size: 28px;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+# maak Spotify client
+token_info = sp_oauth.validate_token(st.session_state["token_info"])
+if not token_info:
+    st.session_state["token_info"] = None
+    st.experimental_rerun()
 
-    # Huidig nummer ophalen
+sp = spotipy.Spotify(auth=token_info["access_token"])
+
+# =========================
+# UI Start
+# =========================
+st.set_page_config(page_title="CarPlay Dashboard", layout="wide")
+
+# Spotify tile bovenaan
+st.markdown(
+    """
+    <style>
+    .spotify-tile {
+        background-color: #121212;
+        border-radius: 20px;
+        padding: 15px;
+        text-align: center;
+        color: white;
+    }
+    .spotify-logo {
+        width: 60px;
+        margin-bottom: 10px;
+    }
+    .track-info {
+        font-size: 18px;
+        font-weight: bold;
+    }
+    .artist-info {
+        font-size: 14px;
+        color: #b3b3b3;
+    }
+    .controls button {
+        background-color: #1DB954;
+        border: none;
+        color: white;
+        padding: 10px 16px;
+        margin: 0 5px;
+        border-radius: 30px;
+        cursor: pointer;
+        font-size: 16px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+with st.container():
+    st.markdown('<div class="spotify-tile">', unsafe_allow_html=True)
+
+    st.image("https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_RGB_White.png", width=120)
+
     current = sp.current_playback()
+    if current and current["is_playing"]:
+        track = current["item"]["name"]
+        artist = ", ".join([a["name"] for a in current["item"]["artists"]])
+        cover = current["item"]["album"]["images"][1]["url"]
 
-    st.markdown('<div class="carplay-card">', unsafe_allow_html=True)
-    st.image("https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg", width=80)
+        st.image(cover, width=150)
+        st.markdown(f"<div class='track-info'>{track}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='artist-info'>{artist}</div>", unsafe_allow_html=True)
 
-    if current and current.get("item"):
-        song = current["item"]["name"]
-        artists = ", ".join([a["name"] for a in current["item"]["artists"]])
-        album_cover = current["item"]["album"]["images"][0]["url"]
-
-        st.image(album_cover, width=250)
-        st.markdown(f'<div class="song-title">{song}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="song-artist">{artists}</div>', unsafe_allow_html=True)
-
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3 = st.columns([1, 1, 1])
         with col1:
             if st.button("⏮️"):
                 sp.previous_track()
@@ -106,44 +120,42 @@ if "token_info" in st.session_state:
         with col3:
             if st.button("⏭️"):
                 sp.next_track()
-
     else:
-        st.write("Geen muziek speelt momenteel.")
+        st.write("Geen muziek aan het spelen.")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ========================
-    # Navigatie
-    # ========================
-    st.markdown('<div class="carplay-card">', unsafe_allow_html=True)
-    st.write("### Navigatie")
+# =========================
+# Maps Tile eronder
+# =========================
+st.markdown("### Navigatie")
 
-    start = st.text_input("Startlocatie (lat,lon)", "52.3676,4.9041")  # Amsterdam
-    end = st.text_input("Eindlocatie (lat,lon)", "52.0907,5.1214")    # Utrecht
+# OpenRouteService API voorbeeld
+ORS_API_KEY = "5b3ce3597851110001cf6248e1b6dcf8c1d34f9bb1a32b6d3b78c4a6"  # demo key
+BASE_URL = "https://api.openrouteservice.org/v2/directions/driving-car"
 
-    if st.button("📍 Route tonen"):
-        try:
-            start_coords = tuple(map(float, start.split(",")))
-            end_coords = tuple(map(float, end.split(",")))
+start_coords = [4.899, 52.372]  # Amsterdam
+end_coords = [5.121, 52.090]    # Utrecht
 
-            url = f"http://router.project-osrm.org/route/v1/driving/{start_coords[1]},{start_coords[0]};{end_coords[1]},{end_coords[0]}?overview=full&geometries=polyline"
-            r = requests.get(url)
-            data = r.json()
+def get_route(start, end):
+    headers = {"Authorization": ORS_API_KEY}
+    params = {"start": f"{start[0]},{start[1]}", "end": f"{end[0]},{end[1]}"}
+    r = requests.get(BASE_URL, headers=headers, params=params)
+    if r.status_code != 200:
+        return None
+    return r.json()
 
-            if "routes" in data and len(data["routes"]) > 0:
-                route = data["routes"][0]["geometry"]
-                points = polyline.decode(route)
+route_data = get_route(start_coords, end_coords)
 
-                m = folium.Map(location=start_coords, zoom_start=8)
-                folium.Marker(start_coords, tooltip="Start").add_to(m)
-                folium.Marker(end_coords, tooltip="Eind").add_to(m)
-                folium.PolyLine(points, color="blue", weight=5).add_to(m)
+if route_data:
+    coords = route_data["features"][0]["geometry"]["coordinates"]
+    steps = route_data["features"][0]["properties"]["segments"][0]["steps"]
 
-                st_folium(m, width=700, height=500)
-            else:
-                st.error("Geen route gevonden.")
-        except Exception as e:
-            st.error(f"Fout bij routeberekening: {e}")
+    m = folium.Map(location=[start_coords[1], start_coords[0]], zoom_start=9)
+    folium.Marker([start_coords[1], start_coords[0]], tooltip="Start").add_to(m)
+    folium.Marker([end_coords[1], end_coords[0]], tooltip="Eind").add_to(m)
+    folium.PolyLine([[lat, lon] for lon, lat in coords], color="blue").add_to(m)
 
-    st.markdown('</div>', unsafe_allow_html=True)
-
+    st_folium(m, width=700, height=400)
+else:
+    st.error("Kon geen route ophalen.")
