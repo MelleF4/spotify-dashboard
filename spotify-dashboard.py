@@ -196,18 +196,58 @@ def main():
         display: flex;
         align-items: center;
         justify-content: center;
+        background-size: 32px 32px;
+        background-repeat: no-repeat;
+        background-position: center;
     }
     .controls-container button:hover { background-color: rgba(255,255,255,0.1); }
     .controls-container button:active { transform: scale(0.95); }
-    .play-button { 
-        background-color: #1DB954 !important; 
+    .st-emotion-cache-19t501u { width: 100% !important; }
+
+    /* Knop specifieke styling met SVG's als achtergrond */
+    .stButton > button[kind="secondary"] {
+        width: 70px !important;
+        height: 70px !important;
+        background-color: transparent;
+        border: none;
+        border-radius: 50%;
+        margin: auto;
+    }
+    .stButton > button[kind="secondary"]:hover {
+        background-color: rgba(255,255,255,0.1);
+    }
+    .stButton > button[kind="secondary"]:active {
+        transform: scale(0.95);
+    }
+
+    /* Play knop */
+    .play-button > button[kind="secondary"] {
+        background-color: #1DB954 !important;
         box-shadow: 0 0 20px rgba(29, 185, 84, 0.5);
     }
-    .play-button:hover { background-color: #1ed760 !important; }
+    .play-button > button[kind="secondary"]:hover {
+        background-color: #1ed760 !important;
+    }
+    
+    /* Vorige knop SVG */
+    .prev-btn > button {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M6 6h2v12H6zm3.5 6l8.5 6V6z'/%3E%3C/svg%3E");
+    }
 
-    /* SVG icon styling */
-    .icon { width: 32px; height: 32px; fill: white; }
-    .icon-play { fill: black; }
+    /* Volgende knop SVG */
+    .next-btn > button {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M16 18h2V6h-2zM6 18V6l8.5 6z'/%3E%3C/svg%3E");
+    }
+
+    /* Pauze knop SVG */
+    .pause-btn > button {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M6 19h4V5H6v14zm8-14v14h4V5h-4z'/%3E%3C/svg%3E");
+    }
+
+    /* Play knop SVG */
+    .play-btn > button {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M8 5v14l11-7z'/%3E%3C/svg%3E");
+    }
 
     /* Recent afgespeeld sectie */
     .recent-header { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
@@ -321,23 +361,38 @@ def main():
                             </div>
                         """, unsafe_allow_html=True)
 
-                    # Bedieningsknoppen met SVG
+                    # Bedieningsknoppen
                     st.markdown('<div class="controls-container">', unsafe_allow_html=True)
                     col_a, col_b, col_c = st.columns([1, 1, 1])
                     with col_a:
-                        if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M11 6c.55 0 1 .45 1 1v10c0 .55-.45 1-1 1s-1-.45-1-1V7c0-.55.45-1 1-1zm6-1c.55 0 1 .45 1 1v12c0 .55-.45 1-1 1s-1-.45-1-1V6c0-.55.45-1 1-1zm-3-2c-5.52 0-10 4.48-10 10s4.48 10 10 10 10-4.48 10-10-4.48-10-10-10zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>', key="prev_btn", unsafe_allow_html=True): 
+                        if st.button("", key="prev_btn", help="Vorige nummer"): 
                             sp.previous_track()
                     with col_b:
                         if current.get("is_playing"):
-                            if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5V7.5l7 4.5-7 4.5z"/></svg>', key="play_pause_btn", unsafe_allow_html=True):
+                            if st.button("", key="pause_btn", help="Pauze"):
                                 sp.pause_playback()
                         else:
-                            if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon play-button" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5V7.5l7 4.5-7 4.5z"/></svg>', key="play_pause_btn", unsafe_allow_html=True):
+                            if st.button("", key="play_btn", help="Speel af"):
                                 sp.start_playback()
                     with col_c:
-                        if st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M6 18c-.55 0-1 .45-1 1s.45 1 1 1h12c.55 0 1-.45 1-1s-.45-1-1-1H6zm11-12h-4v12h4V6zm-6 0H6v12h4V6z"/></svg>', key="next_btn", unsafe_allow_html=True):
+                        if st.button("", key="next_btn", help="Volgende nummer"):
                             sp.next_track()
                     st.markdown('</div>', unsafe_allow_html=True)
+                    st.markdown("""
+                        <script>
+                        document.addEventListener("DOMContentLoaded", function() {
+                            const prevBtn = document.querySelector('[data-testid="stButton"] button[title="Vorige nummer"]');
+                            if (prevBtn) prevBtn.classList.add("prev-btn");
+                            const nextBtn = document.querySelector('[data-testid="stButton"] button[title="Volgende nummer"]');
+                            if (nextBtn) nextBtn.classList.add("next-btn");
+                            const playBtn = document.querySelector('[data-testid="stButton"] button[title="Speel af"]');
+                            if (playBtn) playBtn.classList.add("play-btn");
+                            const pauseBtn = document.querySelector('[data-testid="stButton"] button[title="Pauze"]');
+                            if (pauseBtn) pauseBtn.classList.add("pause-btn");
+                        });
+                        </script>
+                    """, unsafe_allow_html=True)
+
 
                 except (requests.exceptions.RequestException, IOError) as e:
                     st.error(f"Fout bij het ophalen van de albumhoes: {e}")
@@ -346,12 +401,21 @@ def main():
                 st.markdown('<div class="controls-container">', unsafe_allow_html=True)
                 col_a, col_b, col_c = st.columns([1, 1, 1])
                 with col_a:
-                    st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M11 6c.55 0 1 .45 1 1v10c0 .55-.45 1-1 1s-1-.45-1-1V7c0-.55.45-1 1-1zm6-1c.55 0 1 .45 1 1v12c0 .55-.45 1-1 1s-1-.45-1-1V6c0-.55.45-1 1-1zm-3-2c-5.52 0-10 4.48-10 10s4.48 10 10 10 10-4.48 10-10-4.48-10-10-10zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>', key="prev_btn", disabled=True, unsafe_allow_html=True)
+                    st.button("", key="prev_btn_disabled", disabled=True)
                 with col_b:
-                    st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon play-button" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5V7.5l7 4.5-7 4.5z"/></svg>', key="play_pause_btn", unsafe_allow_html=True)
+                    st.button("", key="play_btn_disabled", help="Speel af", disabled=True)
                 with col_c:
-                    st.button('<svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"><path d="M6 18c-.55 0-1 .45-1 1s.45 1 1 1h12c.55 0 1-.45 1-1s-.45-1-1-1H6zm11-12h-4v12h4V6zm-6 0H6v12h4V6z"/></svg>', key="next_btn", disabled=True, unsafe_allow_html=True)
+                    st.button("", key="next_btn_disabled", disabled=True)
                 st.markdown('</div>', unsafe_allow_html=True)
+                st.markdown("""
+                    <script>
+                    document.addEventListener("DOMContentLoaded", function() {
+                        const playBtn = document.querySelector('[data-testid="stButton"] button[title="Speel af"]');
+                        if (playBtn) playBtn.classList.add("play-btn");
+                    });
+                    </script>
+                """, unsafe_allow_html=True)
+
 
         except Exception as e:
             st.error(f"Er is een onverwachte fout opgetreden: {e}")
