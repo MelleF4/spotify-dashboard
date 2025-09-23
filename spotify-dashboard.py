@@ -71,25 +71,90 @@ def main():
     st.set_page_config(page_title="CarPlay Spotify", layout="wide")
 
     # =========================
-    # CSS Styling voor een compacte CarPlay-look
+    # CSS Styling voor een native CarPlay-look
     # =========================
     st.markdown("""
     <style>
+    /* Algemene stijl */
     body { background: #000; font-family: -apple-system,BlinkMacSystemFont,sans-serif; color: white; margin: 0; padding: 0; }
-    .glass-tile { background: rgba(20,20,20,0.6); backdrop-filter: blur(25px); border-radius: 20px; padding: 10px; margin: 5px; box-shadow: 0 5px 20px rgba(0,0,0,0.5); }
-    .track-info { font-size: 18px; font-weight: 700; margin-top: 5px; }
-    .artist-info { font-size: 13px; color: #b3b3b3; margin-bottom: 5px; }
-    .controls-container { text-align: center; }
-    .controls button { background-color: #1DB954; border: none; color: white; padding: 8px 16px; margin: 0 4px; border-radius: 40px; cursor: pointer; font-size: 14px; transition: all 0.25s; }
-    .controls button:hover { transform: scale(1.1); box-shadow: 0 0 10px #1DB954; }
-    .visualizer div { display: inline-block; width: 6px; margin: 1px; background: #1DB954; border-radius: 3px; animation: bounce 1s infinite; }
-    @keyframes bounce { 0%, 100% { transform: scaleY(0.5); } 50% { transform: scaleY(1.2); } }
-    .scrolling-tiles { display: flex; overflow-x: auto; padding: 5px; }
-    .scrolling-tiles div { margin-right: 8px; flex: 0 0 auto; text-align: center; font-size: 10px; }
-    .scrolling-tiles img { border-radius: 10px; }
-    .progress-bar-container { background: rgba(255,255,255,0.1); border-radius: 8px; width: 100%; height: 5px; margin: 5px 0; }
+    
+    /* Glazen tegel effect */
+    .glass-tile { 
+        background: rgba(20,20,20,0.6); 
+        backdrop-filter: blur(25px); 
+        border-radius: 20px; 
+        padding: 15px; 
+        margin: 5px; 
+        box-shadow: 0 5px 20px rgba(0,0,0,0.5); 
+        border: 1px solid rgba(255,255,255,0.1);
+        width: 100%;
+    }
+
+    /* Hoes en info */
+    .album-art-container { text-align: center; margin-bottom: 20px; }
+    .album-art { border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.7); }
+    .track-info { font-size: 20px; font-weight: 700; margin-top: 10px; text-align: center; }
+    .artist-info { font-size: 14px; color: #b3b3b3; text-align: center; }
+
+    /* Voortgangsbalk */
+    .progress-bar-container { background: rgba(255,255,255,0.1); border-radius: 8px; width: 100%; height: 5px; margin: 15px 0 10px; }
     .progress-bar { background: #1DB954; height: 100%; border-radius: 8px; transition: width 0.5s; }
-    .logout-button { background-color: rgba(255, 92, 92, 0.5); border: none; color: white; padding: 5px 10px; border-radius: 10px; cursor: pointer; font-size: 12px; float: right; margin: 5px; }
+
+    /* Bedieningselementen */
+    .controls-container { text-align: center; display: flex; justify-content: space-around; padding: 10px; }
+    .controls-container button { 
+        background-color: #1DB954; 
+        border: none; 
+        color: white; 
+        width: 60px;
+        height: 60px;
+        border-radius: 50%; 
+        cursor: pointer; 
+        font-size: 24px; 
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .controls-container button:hover { transform: scale(1.1); }
+    .controls-container button:active { transform: scale(0.95); box-shadow: inset 0 0 10px rgba(0,0,0,0.3); }
+
+    /* Recent afgespeeld sectie */
+    .recent-header { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+    .scrolling-tiles { display: flex; overflow-x: scroll; padding: 5px; -webkit-overflow-scrolling: touch; }
+    .scrolling-tiles::-webkit-scrollbar { display: none; }
+    .scrolling-tiles div { 
+        margin-right: 15px; 
+        flex: 0 0 auto; 
+        text-align: center; 
+        font-size: 10px; 
+        width: 80px;
+    }
+    .scrolling-tiles img { border-radius: 10px; width: 80px; height: 80px; object-fit: cover; }
+    .recent-track-name { 
+        white-space: nowrap; 
+        overflow: hidden; 
+        text-overflow: ellipsis; 
+        color: #b3b3b3; 
+        font-size: 11px;
+    }
+    .recent-artist-name { 
+        white-space: nowrap; 
+        overflow: hidden; 
+        text-overflow: ellipsis; 
+        color: #777; 
+        font-size: 10px;
+    }
+
+    /* Logout knop */
+    .logout-button { 
+        background-color: transparent; 
+        border: none; 
+        color: rgba(255, 92, 92, 0.7); 
+        padding: 5px 10px; 
+        cursor: pointer; 
+        font-size: 12px; 
+        float: right; 
+        margin: 5px; 
+    }
+    .logout-button:hover { color: rgba(255, 92, 92, 1); }
     </style>
     """, unsafe_allow_html=True)
 
@@ -98,29 +163,30 @@ def main():
     if not sp:
         handle_login()
     else:
-        # Gebruiker is geauthenticeerd, toon het dashboard
-        if st.button("Log uit", key="logout_btn", help="Klik om uit te loggen en de cache te wissen"):
+        # Toon logout knop
+        if st.button("Log uit", key="logout_btn"):
             st.session_state.clear()
             st.rerun()
 
-        st.title("CarPlay Spotify")
+        st.markdown('<div class="glass-tile">', unsafe_allow_html=True)
+        try:
+            current = sp.current_playback()
+            if current and current.get("item"):
+                track = current["item"]["name"]
+                artist = ", ".join([a["name"] for a in current["item"]["artists"]])
+                cover_url = current["item"]["album"]["images"][0]["url"]
+                
+                response = requests.get(cover_url)
+                response.raise_for_status()
+                
+                img = Image.open(BytesIO(response.content))
+                
+                col_left, col_right = st.columns([1, 1])
 
-        col1, col2 = st.columns([1, 1])
-
-        with col1:
-            try:
-                current = sp.current_playback()
-                if current and current.get("item"):
-                    track = current["item"]["name"]
-                    artist = ", ".join([a["name"] for a in current["item"]["artists"]])
-                    cover_url = current["item"]["album"]["images"][0]["url"]
-                    
-                    response = requests.get(cover_url)
-                    response.raise_for_status() # Roept een fout op bij slechte respons
-                    
-                    img = Image.open(BytesIO(response.content)).resize((200, 200))
-                    st.image(img, width=180, caption=f"{track} by {artist}")
-
+                with col_left:
+                    st.image(img, width=200, output_format="PNG", caption=f"")
+                
+                with col_right:
                     st.markdown(f"<div class='track-info'>{track}</div>", unsafe_allow_html=True)
                     st.markdown(f"<div class='artist-info'>{artist}</div>", unsafe_allow_html=True)
 
@@ -133,52 +199,48 @@ def main():
                             <div class='progress-bar' style='width:{pct}%;'></div>
                         </div>
                     """, unsafe_allow_html=True)
-                    
-                    # Audiovisualizer (alleen esthetisch)
-                    bars = np.random.randint(5, 45, size=20)
-                    bar_html = "".join([f"<div style='height:{h}px'></div>" for h in bars])
-                    st.markdown(f"<div class='visualizer'>{bar_html}</div>", unsafe_allow_html=True)
 
-                else:
-                    st.write("Er wordt momenteel geen muziek afgespeeld.")
-            except requests.exceptions.RequestException as e:
-                st.error(f"Fout bij het ophalen van de albumhoes: {e}")
-            except Exception as e:
-                st.error(f"Er is een onverwachte fout opgetreden: {e}")
+                    # Bedieningsknoppen
+                    col_a, col_b, col_c = st.columns([1, 1, 1])
+                    with col_a:
+                        if st.button("⏮️", key="prev_btn"): sp.previous_track()
+                    with col_b:
+                        if st.button("⏯️", key="play_pause_btn"):
+                            if current and current["is_playing"]:
+                                sp.pause_playback()
+                            else:
+                                sp.start_playback()
+                    with col_c:
+                        if st.button("⏭️", key="next_btn"): sp.next_track()
+            else:
+                st.write("Er wordt momenteel geen muziek afgespeeld.")
+        except requests.exceptions.RequestException as e:
+            st.error(f"Fout bij het ophalen van de albumhoes: {e}")
+        except Exception as e:
+            st.error(f"Er is een onverwachte fout opgetreden: {e}")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        with col2:
-            st.markdown('<div class="glass-tile controls-container">', unsafe_allow_html=True)
-            col_a, col_b, col_c = st.columns([1, 1, 1])
-            with col_a:
-                if st.button("⏮️", key="prev_btn"): sp.previous_track()
-            with col_b:
-                if st.button("⏯️", key="play_pause_btn"):
-                    if current and current["is_playing"]:
-                        sp.pause_playback()
-                    else:
-                        sp.start_playback()
-            with col_c:
-                if st.button("⏭️", key="next_btn"): sp.next_track()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-            # Recent afgespeeld
-            try:
-                recent = sp.current_user_recently_played(limit=6)
-                st.markdown("<div class='glass-tile'><h3>Recent afgespeeld</h3><div class='scrolling-tiles'>", unsafe_allow_html=True)
-                for item in recent["items"]:
-                    t_name = item["track"]["name"]
-                    a_name = ", ".join([a["name"] for a in item["track"]["artists"]])
-                    cover_url = item["track"]["album"]["images"][2]["url"]
-                    st.markdown(f"""
-                        <div>
-                        <img src="{cover_url}" width="70" style="border-radius:10px;"><br>
-                        <span style="color:#b3b3b3;font-size:10px;">{t_name}</span><br>
-                        <span style="color:#777;font-size:9px;">{a_name}</span>
-                        </div>
-                    """, unsafe_allow_html=True)
-                st.markdown("</div></div>", unsafe_allow_html=True)
-            except Exception as e:
-                st.error(f"Fout bij het ophalen van recent afgespeelde nummers: {e}")
+        st.markdown('<div class="glass-tile">', unsafe_allow_html=True)
+        st.markdown('<div class="recent-header">Recent afgespeeld</div>', unsafe_allow_html=True)
+        # Recent afgespeeld
+        try:
+            recent = sp.current_user_recently_played(limit=6)
+            st.markdown("<div class='scrolling-tiles'>", unsafe_allow_html=True)
+            for item in recent["items"]:
+                t_name = item["track"]["name"]
+                a_name = ", ".join([a["name"] for a in item["track"]["artists"]])
+                cover_url = item["track"]["album"]["images"][2]["url"]
+                st.markdown(f"""
+                    <div>
+                    <img src="{cover_url}" width="80" class="album-art"><br>
+                    <span class="recent-track-name">{t_name}</span><br>
+                    <span class="recent-artist-name">{a_name}</span>
+                    </div>
+                """, unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Fout bij het ophalen van recent afgespeelde nummers: {e}")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
