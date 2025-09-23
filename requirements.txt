@@ -1,6 +1,6 @@
 streamlit
 spotipy
 requests
-polyline
 folium
 streamlit-folium
+Pillow
