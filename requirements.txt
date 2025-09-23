@@ -1,6 +1,7 @@
+folium
+streamlit-folium
 streamlit
 spotipy
 requests
-folium
-streamlit-folium
 Pillow
+numpy
