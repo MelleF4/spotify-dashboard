@@ -42,16 +42,23 @@ def handle_login():
     if "token_info" not in st.session_state or not st.session_state["token_info"]:
         sp_oauth = get_spotify_oauth()
         auth_url = sp_oauth.get_authorize_url()
+        st.markdown("<div class='login-prompt'>", unsafe_allow_html=True)
         st.markdown("### 1️⃣ Log in bij Spotify")
         st.markdown(f"[Klik hier om in te loggen bij Spotify]({auth_url})")
-        code = st.text_input("### 2️⃣ Plak de code uit de URL hier", key="auth_code")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        st.markdown("<div class='login-prompt'>", unsafe_allow_html=True)
+        st.markdown("### 2️⃣ Plak de code uit de URL hier", unsafe_allow_html=True)
+        code = st.text_input("", key="auth_code", help="Plak de URL en haal alleen de code eruit. Je vindt die na '?code=' en voor '&state='")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
         if code:
             try:
                 token_info = sp_oauth.get_access_token(code, as_dict=True)
                 st.session_state["token_info"] = token_info
                 st.rerun()
             except Exception as e:
-                st.error(f"Spotify inloggen mislukt: {e}")
+                st.error(f"Spotify inloggen mislukt. Zorg ervoor dat je alleen de code hebt geplakt. Fout: {e}")
                 st.session_state["token_info"] = None
 
 def get_current_spotify_session():
@@ -88,13 +95,14 @@ def main():
         box-shadow: 0 5px 20px rgba(0,0,0,0.5); 
         border: 1px solid rgba(255,255,255,0.1);
         width: 100%;
+        overflow: hidden;
     }
 
     /* Hoes en info */
-    .album-art-container { text-align: center; margin-bottom: 20px; }
+    .album-art-container { text-align: center; }
     .album-art { border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.7); }
-    .track-info { font-size: 20px; font-weight: 700; margin-top: 10px; text-align: center; }
-    .artist-info { font-size: 14px; color: #b3b3b3; text-align: center; }
+    .track-info { font-size: 20px; font-weight: 700; margin-top: 10px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .artist-info { font-size: 14px; color: #b3b3b3; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* Voortgangsbalk */
     .progress-bar-container { background: rgba(255,255,255,0.1); border-radius: 8px; width: 100%; height: 5px; margin: 15px 0 10px; }
@@ -112,6 +120,9 @@ def main():
         cursor: pointer; 
         font-size: 24px; 
         transition: transform 0.2s, box-shadow 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     .controls-container button:hover { transform: scale(1.1); }
     .controls-container button:active { transform: scale(0.95); box-shadow: inset 0 0 10px rgba(0,0,0,0.3); }
@@ -145,16 +156,44 @@ def main():
 
     /* Logout knop */
     .logout-button { 
-        background-color: transparent; 
+        background-color: rgba(255, 92, 92, 0.7); 
         border: none; 
-        color: rgba(255, 92, 92, 0.7); 
+        color: white; 
         padding: 5px 10px; 
+        border-radius: 10px; 
         cursor: pointer; 
         font-size: 12px; 
         float: right; 
         margin: 5px; 
+        transition: background-color 0.3s;
     }
-    .logout-button:hover { color: rgba(255, 92, 92, 1); }
+    .logout-button:hover { background-color: rgba(255, 92, 92, 1); }
+
+    /* Algemene lay-out aanpassingen */
+    .stApp { background-color: #000; }
+    .main-container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        width: 100%;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+    .music-player-card {
+        width: 100%;
+        max-width: 600px;
+        margin-bottom: 20px;
+    }
+    .recent-played-card {
+        width: 100%;
+        max-width: 600px;
+    }
+    .login-prompt {
+        text-align: center;
+        padding: 20px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -164,11 +203,14 @@ def main():
         handle_login()
     else:
         # Toon logout knop
-        if st.button("Log uit", key="logout_btn"):
+        if st.button("Log uit", key="logout_btn", help="Klik om uit te loggen en de cache te wissen"):
             st.session_state.clear()
             st.rerun()
 
-        st.markdown('<div class="glass-tile">', unsafe_allow_html=True)
+        st.markdown('<div class="main-container">', unsafe_allow_html=True)
+        
+        # Muziekspeler sectie
+        st.markdown('<div class="glass-tile music-player-card">', unsafe_allow_html=True)
         try:
             current = sp.current_playback()
             
@@ -177,23 +219,20 @@ def main():
                 artist = ", ".join([a["name"] for a in current["item"]["artists"]])
                 cover_url = current["item"]["album"]["images"][0]["url"]
                 
-                # Probeer albumhoes te downloaden, met foutafhandeling
                 try:
                     response = requests.get(cover_url, timeout=5)
                     response.raise_for_status()
                     img = Image.open(BytesIO(response.content))
                     
-                    col_left, col_right = st.columns([1, 1])
-                    with col_left:
-                        st.image(img, width=200, output_format="PNG", caption="")
+                    st.columns(3)[1].image(img, width=250, output_format="PNG", caption="")
                     
-                    with col_right:
-                        st.markdown(f"<div class='track-info'>{track}</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div class='artist-info'>{artist}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='track-info'>{track}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='artist-info'>{artist}</div>", unsafe_allow_html=True)
 
-                        # Voortgangsbalk
-                        duration = current["item"]["duration_ms"]
-                        progress = current["progress_ms"]
+                    # Voortgangsbalk
+                    duration = current["item"]["duration_ms"]
+                    progress = current["progress_ms"]
+                    if duration > 0:
                         pct = int((progress / duration) * 100)
                         st.markdown(f"""
                             <div class='progress-bar-container'>
@@ -201,18 +240,18 @@ def main():
                             </div>
                         """, unsafe_allow_html=True)
 
-                        # Bedieningsknoppen
-                        col_a, col_b, col_c = st.columns([1, 1, 1])
-                        with col_a:
-                            if st.button("⏮️", key="prev_btn"): sp.previous_track()
-                        with col_b:
-                            if st.button("⏯️", key="play_pause_btn"):
-                                if current and current.get("is_playing"):
-                                    sp.pause_playback()
-                                else:
-                                    sp.start_playback()
-                        with col_c:
-                            if st.button("⏭️", key="next_btn"): sp.next_track()
+                    # Bedieningsknoppen
+                    col_a, col_b, col_c = st.columns([1, 1, 1])
+                    with col_a:
+                        if st.button("⏮️", key="prev_btn"): sp.previous_track()
+                    with col_b:
+                        if st.button("⏯️", key="play_pause_btn"):
+                            if current and current.get("is_playing"):
+                                sp.pause_playback()
+                            else:
+                                sp.start_playback()
+                    with col_c:
+                        if st.button("⏭️", key="next_btn"): sp.next_track()
                 except (requests.exceptions.RequestException, IOError) as e:
                     st.error(f"Fout bij het ophalen van de albumhoes: {e}")
             else:
@@ -231,27 +270,29 @@ def main():
             st.error(f"Er is een onverwachte fout opgetreden: {e}")
         st.markdown('</div>', unsafe_allow_html=True)
 
-        st.markdown('<div class="glass-tile">', unsafe_allow_html=True)
+        # Recent afgespeeld sectie
+        st.markdown('<div class="glass-tile recent-played-card">', unsafe_allow_html=True)
         st.markdown('<div class="recent-header">Recent afgespeeld</div>', unsafe_allow_html=True)
-        # Recent afgespeeld
         try:
             recent = sp.current_user_recently_played(limit=6)
             if recent and "items" in recent:
                 st.markdown("<div class='scrolling-tiles'>", unsafe_allow_html=True)
                 for item in recent["items"]:
-                    t_name = item["track"]["name"]
-                    a_name = ", ".join([a["name"] for a in item["track"]["artists"]])
-                    cover_url = item["track"]["album"]["images"][2]["url"]
-                    st.markdown(f"""
-                        <div>
-                        <img src="{cover_url}" width="80" class="album-art"><br>
-                        <span class="recent-track-name">{t_name}</span><br>
-                        <span class="recent-artist-name">{a_name}</span>
-                        </div>
-                    """, unsafe_allow_html=True)
+                    if "track" in item and "album" in item["track"] and "images" in item["track"]["album"]:
+                        t_name = item["track"]["name"]
+                        a_name = ", ".join([a["name"] for a in item["track"]["artists"]])
+                        cover_url = item["track"]["album"]["images"][2]["url"]
+                        st.markdown(f"""
+                            <div>
+                            <img src="{cover_url}" width="80" class="album-art"><br>
+                            <span class="recent-track-name">{t_name}</span><br>
+                            <span class="recent-artist-name">{a_name}</span>
+                            </div>
+                        """, unsafe_allow_html=True)
                 st.markdown("</div>", unsafe_allow_html=True)
         except Exception as e:
             st.error(f"Fout bij het ophalen van recent afgespeelde nummers: {e}")
+        st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
