@@ -12,7 +12,7 @@ st.set_page_config(page_title="CarPlay Spotify", layout="wide")
 # Secrets ophalen
 CLIENT_ID = st.secrets["CLIENT_ID"]
 CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
-REDIRECT_URI = "http://localhost:8888/callback"
+REDIRECT_URI = st.secrets["REDIRECT_URL"]
 SCOPE = "user-read-playback-state user-modify-playback-state user-read-currently-playing"
 
 # Spotify auth
@@ -130,5 +130,6 @@ else:
 
     else:
         st.write("Geen muziek speelt momenteel 🎵")
+
 
 
