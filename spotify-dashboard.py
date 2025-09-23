@@ -8,12 +8,12 @@ import numpy as np
 import time
 
 # =========================
-# Spotify instellingen
+# Spotify instellingen via st.secrets
 # =========================
 CLIENT_ID = st.secrets["CLIENT_ID"]
 CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
 REDIRECT_URI = st.secrets["REDIRECT_URI"]
-SCOPE = "user-read-playback-state,user-modify-playback-state,user-read-currently-playing,user-read-recently-played,user-top-read,user-read-private,user-read-email"
+SCOPE = "user-read-playback-state,user-modify-playback-state,user-read-currently-playing,user-read-recently-played,user-top-read"
 
 sp_oauth = SpotifyOAuth(
     client_id=CLIENT_ID,
@@ -52,7 +52,7 @@ if st.session_state["token_info"]:
         st.experimental_rerun()
 
     sp = spotipy.Spotify(auth=token_info["access_token"])
-    st.set_page_config(page_title="CarPlay Dashboard", layout="wide")
+    st.set_page_config(page_title="Spotify Dashboard", layout="wide")
 
     # =========================
     # CSS Styling
@@ -61,12 +61,12 @@ if st.session_state["token_info"]:
     <style>
     body { background-color:#0d0d0d; font-family:-apple-system,BlinkMacSystemFont,sans-serif; color:white; }
     .tile { background-color:#121212; border-radius:20px; padding:15px; box-shadow:0 5px 15px rgba(0,0,0,0.5); margin-bottom:15px; }
-    .track-info {font-size:22px; font-weight:700; margin-bottom:5px;}
-    .artist-info {font-size:16px; color:#b3b3b3; margin-bottom:10px;}
-    .controls button {background-color:#1DB954; border:none; color:white; padding:12px 18px; margin:0 5px; border-radius:50px; cursor:pointer; font-size:20px; transition:all 0.2s;}
+    .track-info {font-size:20px; font-weight:600; margin-bottom:5px;}
+    .artist-info {font-size:14px; color:#b3b3b3; margin-bottom:10px;}
+    .controls button {background-color:#1DB954; border:none; color:white; padding:10px 15px; margin:0 5px; border-radius:50px; cursor:pointer; font-size:16px; transition:all 0.2s;}
     .controls button:hover {transform:scale(1.2); box-shadow:0 0 10px #1DB954;}
-    .cover-glow {border-radius:15px; box-shadow:0 0 50px rgba(29,185,84,0.7); animation: pulse 2s infinite;}
-    @keyframes pulse {0%{box-shadow:0 0 20px rgba(29,185,84,0.5);}50%{box-shadow:0 0 60px rgba(29,185,84,0.9);}100%{box-shadow:0 0 20px rgba(29,185,84,0.5);}}
+    .cover-glow {border-radius:15px; box-shadow:0 0 40px rgba(29,185,84,0.7); animation: pulse 2s infinite;}
+    @keyframes pulse {0%{box-shadow:0 0 20px rgba(29,185,84,0.5);}50%{box-shadow:0 0 50px rgba(29,185,84,0.9);}100%{box-shadow:0 0 20px rgba(29,185,84,0.5);}}
     .scrolling-tiles {display:flex; overflow-x:auto; padding:5px;}
     .scrolling-tiles div {margin-right:10px; flex:0 0 auto; text-align:center;}
     </style>
@@ -76,64 +76,50 @@ if st.session_state["token_info"]:
     # Fetch current playback
     # =========================
     current = sp.current_playback()
-    col_left, col_right = st.columns([1,1])
+    col1, col2 = st.columns([1,1])
 
-    # ===== LEFT PANEL: Album + Visualizer =====
-    with col_left:
+    with col1:
         if current and current.get("item"):
             track = current["item"]["name"]
             artist = ", ".join([a["name"] for a in current["item"]["artists"]])
             cover_url = current["item"]["album"]["images"][1]["url"]
             response = requests.get(cover_url)
-            img = Image.open(BytesIO(response.content)).resize((180,180))
-            glow = img.filter(ImageFilter.GaussianBlur(radius=25))
+            img = Image.open(BytesIO(response.content)).resize((160,160))
+            glow = img.filter(ImageFilter.GaussianBlur(radius=20))
 
-            st.image(glow, width=250)
-            st.image(img, width=180)
+            st.image(glow, width=200)
+            st.image(img, width=160)
             st.markdown(f"<div class='track-info'>{track}</div>", unsafe_allow_html=True)
             st.markdown(f"<div class='artist-info'>{artist}</div>", unsafe_allow_html=True)
 
-            # Horizontal Audio visualizer
-            bars = np.random.randint(5,40, size=12)
-            bar_html = "".join([f"<div style='display:inline-block;width:12px;height:{h}px;margin:1px;background:#1DB954;border-radius:5px;animation:bounce 1s infinite;'></div>" for h in bars])
+            # Audio visualizer
+            bars = np.random.randint(5,40, size=10)
+            bar_html = "".join([f"<div style='display:inline-block;width:10px;height:{h}px;margin:1px;background:#1DB954;border-radius:5px;animation:bounce 1s infinite;'></div>" for h in bars])
             st.markdown(f"<div style='margin:10px 0'>{bar_html}</div>", unsafe_allow_html=True)
             st.markdown("<style>@keyframes bounce {0%,100%{transform:scaleY(0.5);}50%{transform:scaleY(1.2);}}</style>", unsafe_allow_html=True)
         else:
             st.write("Geen muziek aan het spelen.")
 
-    # ===== RIGHT PANEL: Controls + Volume + Recent =====
-    with col_right:
+    with col2:
         st.markdown("<div class='tile' style='text-align:center;'>", unsafe_allow_html=True)
-        # Media controls
         col_a, col_b, col_c = st.columns([1,1,1])
         with col_a:
             if st.button("⏮️"): sp.previous_track()
         with col_b:
             if st.button("⏯️"):
-                if current and current.get("is_playing"): sp.pause_playback()
-                else: sp.start_playback()
+                if current and current["is_playing"]:
+                    sp.pause_playback()
+                else:
+                    sp.start_playback()
         with col_c:
             if st.button("⏭️"): sp.next_track()
-
-        # Device + Volume (veilig)
-        devices = sp.devices()["devices"]
-        if devices:
-            device_names = [d["name"] for d in devices]
-            selected_device = st.selectbox("Device", device_names)
-            vol = st.slider("Volume", min_value=0, max_value=100, value=current["device"]["volume_percent"] if current else 50)
-            device_id = [d["id"] for d in devices if d["name"]==selected_device][0]
-
-            # Alleen versturen als playback actief en device geldig
-            if current and current.get("device") and current["device"]["id"] == device_id:
-                try:
-                    sp.volume(vol, device_id=device_id)
-                except spotipy.exceptions.SpotifyException:
-                    st.warning("Kan volume niet aanpassen: controleer dat het apparaat actief is op Spotify Connect.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Recently played
-        recent = sp.current_user_recently_played(limit=6)
-        st.markdown("### 🎵 Recently Played")
+        # =========================
+        # Recently played compact
+        # =========================
+        recent = sp.current_user_recently_played(limit=8)
+        st.markdown("### 🎵 Recent Geluisterd")
         st.markdown('<div class="scrolling-tiles">', unsafe_allow_html=True)
         for item in recent["items"]:
             t_name = item["track"]["name"]
@@ -148,6 +134,8 @@ if st.session_state["token_info"]:
             """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # ===== Auto-refresh =====
+    # =========================
+    # Auto-refresh
+    # =========================
     time.sleep(5)
     st.experimental_rerun()
