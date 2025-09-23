@@ -29,7 +29,7 @@ if "token_info" not in st.session_state:
     st.session_state["token_info"] = None
 
 auth_url = sp_oauth.get_authorize_url()
-query_params = st.experimental_get_query_params()
+query_params = st.get_query_params()
 
 if "code" in query_params and st.session_state["token_info"] is None:
     code = query_params["code"][0]
@@ -159,3 +159,4 @@ if route_data:
     st_folium(m, width=700, height=400)
 else:
     st.error("Kon geen route ophalen.")
+
