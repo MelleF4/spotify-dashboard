@@ -1,6 +1,7 @@
 streamlit
 spotipy
-Pillow
-numpy
 requests
+Pillow
 streamlit-autorefresh
+streamlit-folium
+folium
