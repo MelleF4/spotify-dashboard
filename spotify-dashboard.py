@@ -45,23 +45,20 @@ def handle_login():
         sp_oauth = get_spotify_oauth()
         auth_url = sp_oauth.get_authorize_url()
         
-        st.markdown("<div class='login-prompt'>", unsafe_allow_html=True)
+        st.markdown("<div class='login-container'>", unsafe_allow_html=True)
+        st.markdown("<div class='glass-tile login-box'>", unsafe_allow_html=True)
         st.markdown("""
-            <div style="text-align: center; margin-bottom: 30px;">
+            <div style="text-align: center;">
                 <svg viewBox="0 0 167.5 167.5" xmlns="http://www.w3.org/2000/svg" style="width: 80px; height: 80px;">
                     <title>Spotify Logo</title>
                     <path fill="#1DB954" d="M83.75 0C37.5 0 0 37.5 0 83.75c0 46.25 37.5 83.75 83.75 83.75 46.25 0 83.75-37.5 83.75-83.75C167.5 37.5 130 0 83.75 0zm37.5 120.5c-2.5 4.5-8.5 6-13 3.5-16-9.5-35.5-11.5-56.5-6.5-5.5 1.5-11.5-1.5-13-7s1.5-11.5 7-13c24.5-6 48.5-3.5 67 8.5 4.5 2.5 5.5 8.5 3 13zm8.5-23.5c-3 5-10 6.5-15 3.5-19.5-12-49.5-15.5-67.5-10.5-6.5 1.5-13.5-2-15-8.5-1.5-6.5 2-13.5 8.5-15 23-6.5 57.5-2.5 80 14 5.5 3 7 10 3.5 15zm0-23.5c-3-5.5-11.5-7.5-17.5-4-26 15.5-65 15-88.5-7.5-5.5-5.5-5.5-14.5 0-20 5.5-5.5 14.5-5.5 20 0 25 24 64 24.5 85 9.5 5-3.5 7-11.5 3.5-17z"/>
                 </svg>
+                <h1 style="color: black; font-size: 24px;">Log in bij Spotify</h1>
             </div>
         """, unsafe_allow_html=True)
-        st.markdown("### 1️⃣ Log in bij Spotify")
-        st.markdown(f"[Klik hier om in te loggen bij Spotify]({auth_url})", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
         
-        st.markdown("<div class='login-prompt'>", unsafe_allow_html=True)
-        st.markdown("### 2️⃣ Plak de code uit de URL hier", unsafe_allow_html=True)
-        code = st.text_input("", key="auth_code", help="Plak de URL en haal alleen de code eruit. Je vindt die na '?code=' en voor '&state='")
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown(f"[Klik hier om in te loggen]({auth_url})", unsafe_allow_html=True)
+        code = st.text_input("Plak de code uit de URL hieronder", key="auth_code")
         
         if code:
             try:
@@ -71,6 +68,9 @@ def handle_login():
             except Exception as e:
                 st.error(f"Spotify inloggen mislukt. Zorg ervoor dat je alleen de code hebt geplakt. Fout: {e}")
                 st.session_state["token_info"] = None
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
 
 def get_current_spotify_session():
     """Retourneert een Spotipy client als de gebruiker is ingelogd, anders None."""
@@ -96,116 +96,110 @@ def main():
     /* Algemene stijl - Lichte modus */
     body { 
         background-color: #f0f0f5; 
-        font-family: -apple-system,BlinkMacSystemFont,sans-serif; 
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
         color: black; 
         margin: 0; 
         padding: 0; 
     }
     
+    .stApp { background-color: #f0f0f5; }
+    
+    .main-container {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: flex-start;
+        gap: 20px;
+        padding: 20px;
+        box-sizing: border-box;
+        height: 100vh;
+        overflow-y: auto;
+    }
+    
     /* Glazen tegel effect voor lichte modus */
     .glass-tile { 
-        background: rgba(255,255,255,0.7); 
+        background: rgba(255, 255, 255, 0.7); 
         backdrop-filter: blur(40px); 
         border-radius: 25px; 
         padding: 20px; 
-        margin: 10px 0; 
-        box-shadow: 0 5px 20px rgba(0,0,0,0.1); 
-        border: 1px solid rgba(0,0,0,0.1);
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1); 
+        border: 1px solid rgba(0, 0, 0, 0.2);
         width: 100%;
         max-width: 600px;
         overflow: hidden;
     }
 
     /* Spotify speler en info */
-    .now-playing-bar {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        background: rgba(255,255,255,0.7); 
-        backdrop-filter: blur(40px);
+    .player-container {
         display: flex;
+        flex-direction: column;
         align-items: center;
-        padding: 15px;
-        border-top-left-radius: 25px;
-        border-top-right-radius: 25px;
-        box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
-        z-index: 100;
-        gap: 15px;
+        text-align: center;
+        gap: 20px;
     }
-    .album-art-small {
+    .album-art-large {
         border-radius: 12px;
-        width: 60px;
-        height: 60px;
+        width: 100%;
+        max-width: 300px;
+        height: auto;
         object-fit: cover;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
     }
-    .track-info-container {
-        flex-grow: 1;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .track-info-small {
-        font-size: 16px; 
+    .track-info-large {
+        font-size: 24px;
         font-weight: 700;
         color: #222;
         white-space: nowrap; 
         overflow: hidden; 
         text-overflow: ellipsis; 
+        margin-bottom: 0;
     }
-    .artist-info-small {
-        font-size: 14px; 
+    .artist-info-large {
+        font-size: 18px; 
         color: #666; 
         white-space: nowrap; 
         overflow: hidden; 
         text-overflow: ellipsis;
+        margin-top: 5px;
     }
 
     /* Bedieningsknoppen */
     .controls-container {
         display: flex;
-        gap: 15px;
+        justify-content: center;
+        align-items: center;
+        gap: 25px;
+        margin-top: 15px;
     }
-    .controls-container button {
-        background-color: transparent;
+    .controls-container .stButton > button {
+        background-color: rgba(255, 255, 255, 0.5);
         border: none;
-        width: 50px;
-        height: 50px;
+        width: 60px;
+        height: 60px;
         border-radius: 50%;
         cursor: pointer;
         transition: background-color 0.2s, transform 0.2s;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        color: black;
+        font-size: 24px;
         display: flex;
-        align-items: center;
         justify-content: center;
-        background-size: 28px 28px;
-        background-repeat: no-repeat;
-        background-position: center;
-        color: transparent !important;
+        align-items: center;
     }
-    .controls-container button:hover { background-color: rgba(0,0,0,0.05); }
-    .controls-container button:active { transform: scale(0.95); }
-    
-    .stButton > button[kind="secondary"] {
-        width: 50px !important;
-        height: 50px !important;
-        background-color: transparent;
-        border: none;
-        border-radius: 50%;
-        margin: auto;
+    .controls-container .stButton > button:hover {
+        background-color: rgba(255, 255, 255, 0.8);
     }
-    .stButton > button[kind="secondary"]:hover {
-        background-color: rgba(0,0,0,0.05);
-    }
-    .stButton > button[kind="secondary"]:active {
+    .controls-container .stButton > button:active {
         transform: scale(0.95);
+        box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.15);
     }
 
-    /* Play knop */
-    .play-btn > button[kind="secondary"] {
+    .play-btn > button {
         background-color: #1DB954 !important;
-        box-shadow: 0 0 10px rgba(29, 185, 84, 0.5);
+        box-shadow: 0 0 10px rgba(29, 185, 84, 0.5) !important;
+        color: white !important;
     }
-    .play-btn > button[kind="secondary"]:hover {
+    .play-btn > button:hover {
         background-color: #1ed760 !important;
     }
     
@@ -224,40 +218,22 @@ def main():
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M6 19h4V5H6v14zm8-14v14h4V5h-4z'/%3E%3C/svg%3E");
     }
 
-    /* Play knop SVG (nu zwart) */
+    /* Play knop SVG (nu wit) */
     .play-btn > button {
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black'%3E%3Cpath d='M8 5v14l11-7z'/%3E%3C/svg%3E");
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3E%3Cpath d='M8 5v14l11-7z'/%3E%3C/svg%3E") !important;
+    }
+    
+    .login-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        width: 100vw;
     }
 
-    /* Algemene lay-out aanpassingen */
-    .stApp { background-color: #f0f0f5; }
-    .main-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        width: 100%;
-        padding: 20px;
-        padding-bottom: 120px; /* Ruimte voor de now playing bar */
-        box-sizing: border-box;
-        height: 100vh;
-        overflow-y: auto;
-    }
-    .login-prompt {
+    .login-box {
         text-align: center;
-        padding: 20px;
-    }
-    .map-container {
-        height: 50vh;
-        width: 100%;
-        border-radius: 25px;
-        overflow: hidden;
-        margin-bottom: 20px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-        border: 1px solid rgba(0,0,0,0.1);
-    }
-    .map-container iframe {
-        border-radius: 25px;
-        border: none;
+        padding: 40px;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -269,85 +245,73 @@ def main():
     else:
         st.markdown('<div class="main-container">', unsafe_allow_html=True)
         
-        # Logout knop
-        if st.button("Log uit", key="logout_btn", help="Klik om uit te loggen en de cache te wissen"):
-            st.session_state.clear()
-            st.rerun()
-
-        # =========================
-        # Kaart sectie (OpenStreetMap)
-        # =========================
-        st.markdown('<div class="glass-tile map-container">', unsafe_allow_html=True)
-        st.markdown("### 🗺️ Kaart")
-        
-        # Maak een Folium kaart gecentreerd op Nederland
-        m = folium.Map(location=[52.1326, 5.2913], zoom_start=8, tiles="OpenStreetMap", width="100%", height="100%")
-        folium_static(m, width=600, height=400) # Past de kaart in de Streamlit app
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        # =========================
-        # Spotify afspeelbalk onderaan
-        # =========================
-        st.markdown('<div class="now-playing-bar">', unsafe_allow_html=True)
-        
-        col_img, col_info, col_controls = st.columns([0.5, 2, 1.5])
-
-        try:
-            current = sp.current_playback()
+        # Kaart Sectie
+        with st.container():
+            st.markdown('<div class="glass-tile map-container">', unsafe_allow_html=True)
+            st.markdown("## 🗺️ Kaart", unsafe_allow_html=True)
             
-            with col_img:
+            m = folium.Map(location=[52.1326, 5.2913], zoom_start=8, tiles="OpenStreetMap", width="100%", height="100%")
+            folium_static(m, width=600, height=400)
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        # Spotify Speler Sectie
+        with st.container():
+            st.markdown('<div class="glass-tile player-container">', unsafe_allow_html=True)
+            
+            st.markdown("## 🎵 Muziek", unsafe_allow_html=True)
+
+            try:
+                current = sp.current_playback()
+                
                 if current and current.get("item"):
-                    cover_url = current["item"]["album"]["images"][2]["url"]
+                    cover_url = current["item"]["album"]["images"][1]["url"]
                     try:
                         response = requests.get(cover_url, timeout=5)
                         response.raise_for_status()
                         img_bytes = BytesIO(response.content)
-                        st.image(img_bytes, width=60, output_format="PNG")
+                        st.image(img_bytes, use_column_width=True, output_format="PNG")
                     except (requests.exceptions.RequestException, IOError):
-                        st.image("https://placehold.co/60x60/333333/FFFFFF?text=Spotify", width=60, output_format="PNG")
-                else:
-                     st.image("https://placehold.co/60x60/333333/FFFFFF?text=Spotify", width=60, output_format="PNG")
+                        st.image("https://placehold.co/300x300/333333/FFFFFF?text=Spotify", use_column_width=True, output_format="PNG")
 
-            with col_info:
-                if current and current.get("item"):
                     track = current["item"]["name"]
                     artist = ", ".join([a["name"] for a in current["item"]["artists"]])
-                    st.markdown(f"<div class='track-info-small'>{track}</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='artist-info-small'>{artist}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<p class='track-info-large'>{track}</p>", unsafe_allow_html=True)
+                    st.markdown(f"<p class='artist-info-large'>{artist}</p>", unsafe_allow_html=True)
+
                 else:
-                    st.markdown("<div class='track-info-small'>Niet aan het afspelen</div>", unsafe_allow_html=True)
-                    st.markdown("<div class='artist-info-small'></div>", unsafe_allow_html=True)
+                    st.image("https://placehold.co/300x300/E0E0E0/444444?text=Geen+muziek", use_column_width=True, output_format="PNG")
+                    st.markdown("<p class='track-info-large'>Niet aan het afspelen</p>", unsafe_allow_html=True)
+                    st.markdown("<p class='artist-info-large'>Log in en speel muziek af om te beginnen</p>", unsafe_allow_html=True)
 
-            with col_controls:
-                # Bedieningsknoppen
-                col_a, col_b, col_c = st.columns([1, 1, 1])
-                with col_a:
-                    if st.button("", key="prev_btn", help="Vorige nummer"): 
-                        sp.previous_track()
-                with col_b:
-                    if current and current.get("is_playing"):
-                        if st.button("", key="pause_btn", help="Pauze"):
-                            sp.pause_playback()
-                    else:
-                        if st.button("", key="play_btn", help="Speel af"):
-                            sp.start_playback()
-                with col_c:
-                    if st.button("", key="next_btn", help="Volgende nummer"):
-                        sp.next_track()
+            except Exception as e:
+                st.error(f"Er is een onverwachte fout opgetreden: {e}")
 
-        except Exception as e:
-            st.error(f"Er is een onverwachte fout opgetreden: {e}")
-        
+            # Bedieningsknoppen
+            col_a, col_b, col_c = st.columns([1, 1, 1])
+            
+            with col_a:
+                if st.button("<<", key="prev_btn", help="Vorige nummer"):
+                    sp.previous_track()
+            with col_b:
+                if current and current.get("is_playing"):
+                    if st.button("||", key="pause_btn", help="Pauze"):
+                        sp.pause_playback()
+                else:
+                    if st.button(">", key="play_btn", help="Speel af"):
+                        sp.start_playback()
+            with col_c:
+                if st.button(">>", key="next_btn", help="Volgende nummer"):
+                    sp.next_track()
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+
         st.markdown("</div>", unsafe_allow_html=True)
         
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Voeg de CSS-klassen toe aan de knoppen
         st.markdown("""
             <script>
             document.addEventListener("DOMContentLoaded", function() {
-                const prevBtn = document.querySelector('[data-testid="stButton"] button[title="Vorige nummer"]');
-                if (prevBtn) prevBtn.classList.add("prev-btn");
-                const nextBtn = document.querySelector('[data-testid="stButton"] button[title="Volgende nummer"]');
-                if (nextBtn) nextBtn.classList.add("next-btn");
                 const playBtn = document.querySelector('[data-testid="stButton"] button[title="Speel af"]');
                 if (playBtn) playBtn.classList.add("play-btn");
                 const pauseBtn = document.querySelector('[data-testid="stButton"] button[title="Pauze"]');
@@ -355,7 +319,6 @@ def main():
             });
             </script>
         """, unsafe_allow_html=True)
-
 
 if __name__ == "__main__":
     main()
