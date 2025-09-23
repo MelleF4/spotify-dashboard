@@ -2,40 +2,45 @@ import streamlit as st
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import requests
-from PIL import Image, ImageFilter, ImageEnhance
+from PIL import Image, ImageFilter
 from io import BytesIO
 import numpy as np
 import time
 
 # =========================
-# Spotify OAuth via st.secrets
+# Spotify instellingen via st.secrets
 # =========================
+CLIENT_ID = st.secrets["spotify"]["client_id"]
+CLIENT_SECRET = st.secrets["spotify"]["client_secret"]
+REDIRECT_URI = st.secrets["spotify"]["redirect_uri"]
+SCOPE = "user-read-playback-state,user-read-currently-playing,user-read-recently-played,user-top-read"
+
 sp_oauth = SpotifyOAuth(
-    client_id=st.secrets["CLIENT_ID"],
-    client_secret=st.secrets["CLIENT_SECRET"],
-    redirect_uri=st.secrets["REDIRECT_URI"],
-    scope="user-read-playback-state user-read-currently-playing user-read-recently-played user-top-read",
+    client_id=CLIENT_ID,
+    client_secret=CLIENT_SECRET,
+    redirect_uri=REDIRECT_URI,
+    scope=SCOPE,
     cache_path=".spotifycache"
 )
 
 # =========================
-# Login flow
+# Spotify login
 # =========================
 if "token_info" not in st.session_state:
     st.session_state["token_info"] = None
 
 if st.session_state["token_info"] is None:
     auth_url = sp_oauth.get_authorize_url()
-    st.markdown("### 🔑 Log in bij Spotify")
-    st.markdown(f"[Klik hier om in te loggen]({auth_url})")
-    code = st.text_input("Plak hier de code uit de URL")
+    st.markdown("### 1️⃣ Log in bij Spotify")
+    st.markdown(f"[Klik hier om in te loggen bij Spotify]({auth_url})")
+    code = st.text_input("### 2️⃣ Plak hier de code uit de URL")
     if code:
         try:
             token_info = sp_oauth.get_access_token(code, as_dict=True)
             st.session_state["token_info"] = token_info
             st.experimental_rerun()
-        except:
-            st.error("Login mislukt!")
+        except Exception as e:
+            st.error(f"Spotify login mislukt: {e}")
 
 # =========================
 # Dashboard
@@ -45,89 +50,149 @@ if st.session_state["token_info"]:
     if not token_info:
         st.session_state["token_info"] = None
         st.experimental_rerun()
+
     sp = spotipy.Spotify(auth=token_info["access_token"])
-    st.set_page_config(page_title="🎶 My Spotify CarPlay", layout="wide")
+    st.set_page_config(page_title="CarPlay Spotify", layout="wide")
 
     # =========================
-    # Styling
+    # CSS Styling - CarPlay look
     # =========================
     st.markdown("""
     <style>
-    body {background: linear-gradient(120deg,#0d0d0d,#1a1a1a); color:white; font-family: 'Segoe UI', sans-serif;}
-    .cover-container {position: relative; display:inline-block;}
-    .cover-glow {border-radius:25px; box-shadow:0 0 70px rgba(29,185,84,0.8); animation:pulse 3s infinite;}
-    @keyframes pulse {0%{box-shadow:0 0 20px rgba(29,185,84,0.4);}50%{box-shadow:0 0 70px rgba(29,185,84,1);}100%{box-shadow:0 0 20px rgba(29,185,84,0.4);}}
-    .track-title {font-size:30px; font-weight:bold; margin-top:15px;}
-    .track-artist {font-size:18px; color:#a3a3a3; margin-bottom:10px;}
-    .controls button {background:#1DB954;border:none;color:white;padding:12px 18px;margin:0 5px;border-radius:50px;font-size:20px;cursor:pointer;transition:0.2s;}
-    .controls button:hover {transform:scale(1.3); box-shadow:0 0 20px #1DB954;}
-    .scroll-container {display:flex; overflow-x:auto; padding:15px;}
-    .scroll-item {margin-right:12px; flex:0 0 auto; text-align:center;}
-    .scroll-item img {border-radius:15px;}
+    body {
+        background: #000;
+        font-family: -apple-system,BlinkMacSystemFont,sans-serif;
+        color:white;
+        margin:0;
+        padding:0;
+    }
+    .glass-tile {
+        background: rgba(20,20,20,0.6);
+        backdrop-filter: blur(25px);
+        border-radius: 25px;
+        padding: 20px;
+        margin: 10px;
+        box-shadow:0 8px 30px rgba(0,0,0,0.7);
+    }
+    .track-info { font-size:28px; font-weight:700; margin-top:15px;}
+    .artist-info { font-size:18px; color:#b3b3b3; margin-bottom:10px;}
+    .controls button {
+        background-color:#1DB954;
+        border:none;
+        color:white;
+        padding:15px 30px;
+        margin:0 5px;
+        border-radius:50px;
+        cursor:pointer;
+        font-size:22px;
+        transition: all 0.25s;
+    }
+    .controls button:hover {
+        transform:scale(1.2);
+        box-shadow:0 0 20px #1DB954;
+    }
+    .visualizer div {
+        display:inline-block;
+        width:12px;
+        margin:1px;
+        background:#1DB954;
+        border-radius:5px;
+        animation:bounce 1s infinite;
+    }
+    @keyframes bounce {
+        0%,100% {transform:scaleY(0.5);}
+        50% {transform:scaleY(1.2);}
+    }
+    .scrolling-tiles { display:flex; overflow-x:auto; padding:10px; }
+    .scrolling-tiles div { margin-right:15px; flex:0 0 auto; text-align:center;}
+    .progress-bar-container {
+        background: rgba(255,255,255,0.1);
+        border-radius: 10px;
+        width: 100%;
+        height: 10px;
+        margin:10px 0;
+    }
+    .progress-bar {
+        background:#1DB954;
+        height: 100%;
+        border-radius:10px;
+        transition: width 0.5s;
+    }
     </style>
     """, unsafe_allow_html=True)
 
     # =========================
-    # Huidige track
+    # Fetch current playback
     # =========================
     current = sp.current_playback()
-    if current and current.get("item"):
-        track = current["item"]["name"]
-        artist = ", ".join([a["name"] for a in current["item"]["artists"]])
-        cover_url = current["item"]["album"]["images"][1]["url"]
+    col1, col2 = st.columns([1,1])
 
-        response = requests.get(cover_url)
-        img = Image.open(BytesIO(response.content)).resize((220,220))
-        glow = img.filter(ImageFilter.GaussianBlur(radius=25))
-        enhancer = ImageEnhance.Brightness(glow)
-        glow = enhancer.enhance(0.5)
+    with col1:
+        if current and current.get("item"):
+            track = current["item"]["name"]
+            artist = ", ".join([a["name"] for a in current["item"]["artists"]])
+            cover_url = current["item"]["album"]["images"][0]["url"]
+            response = requests.get(cover_url)
+            img = Image.open(BytesIO(response.content)).resize((250,250))
+            glow = img.filter(ImageFilter.GaussianBlur(radius=35))
 
-        col1, col2 = st.columns([2,1])
-        with col1:
-            st.image(glow, width=260, output_format="PNG", caption=None)
-            st.image(img, width=220)
-            st.markdown(f"<div class='track-title'>{track}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='track-artist'>{artist}</div>", unsafe_allow_html=True)
+            # Achtergrond cover
+            st.image(glow, width=400)
+            st.image(img, width=250)
+            st.markdown(f"<div class='track-info'>{track}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='artist-info'>{artist}</div>", unsafe_allow_html=True)
 
-            # Simpele visualizer
-            bars = np.random.randint(5,60, size=15)
-            bar_html = "".join([f"<div style='display:inline-block;width:12px;height:{h}px;margin:2px;background:#1DB954;border-radius:5px;animation:bounce 1s infinite;'></div>" for h in bars])
-            st.markdown(f"<div style='margin:15px 0'>{bar_html}</div>", unsafe_allow_html=True)
-            st.markdown("<style>@keyframes bounce{0%,100%{transform:scaleY(0.5);}50%{transform:scaleY(1.2);}}</style>", unsafe_allow_html=True)
-
-        with col2:
-            st.markdown("<div class='controls'>", unsafe_allow_html=True)
-            if st.button("⏮️"): sp.previous_track()
-            if st.button("⏯️"): 
-                if current["is_playing"]: sp.pause_playback()
-                else: sp.start_playback()
-            if st.button("⏭️"): sp.next_track()
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        # =========================
-        # Recently Played
-        # =========================
-        recent = sp.current_user_recently_played(limit=8)
-        st.markdown("### 🔄 Recently Played")
-        st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
-        for item in recent["items"]:
-            tname = item["track"]["name"]
-            aname = ", ".join([a["name"] for a in item["track"]["artists"]])
-            cover = item["track"]["album"]["images"][2]["url"]
+            # Progress bar
+            duration = current["item"]["duration_ms"]
+            progress = current["progress_ms"]
+            pct = int((progress/duration)*100)
             st.markdown(f"""
-                <div class='scroll-item'>
-                    <img src='{cover}' width='90'><br>
-                    <span style='color:#b3b3b3;font-size:12px;'>{tname}</span><br>
-                    <span style='color:#888;font-size:10px;'>{aname}</span>
+                <div class='progress-bar-container'>
+                    <div class='progress-bar' style='width:{pct}%;'></div>
                 </div>
             """, unsafe_allow_html=True)
+
+            # Audio visualizer
+            bars = np.random.randint(5,50, size=20)
+            bar_html = "".join([f"<div style='height:{h}px'></div>" for h in bars])
+            st.markdown(f"<div class='visualizer'>{bar_html}</div>", unsafe_allow_html=True)
+        else:
+            st.write("Geen muziek aan het spelen.")
+
+    with col2:
+        st.markdown('<div class="glass-tile" style="text-align:center;">', unsafe_allow_html=True)
+        col_a, col_b, col_c = st.columns([1,1,1])
+        with col_a:
+            if st.button("⏮️"): sp.previous_track()
+        with col_b:
+            if st.button("⏯️"):
+                if current and current["is_playing"]:
+                    sp.pause_playback()
+                else:
+                    sp.start_playback()
+        with col_c:
+            if st.button("⏭️"): sp.next_track()
         st.markdown('</div>', unsafe_allow_html=True)
 
-    else:
-        st.write("Geen muziek aan het spelen momenteel.")
+        # Recently Played
+        recent = sp.current_user_recently_played(limit=8)
+        st.markdown("<div class='glass-tile'><h3>Recently Played</h3><div class='scrolling-tiles'>", unsafe_allow_html=True)
+        for item in recent["items"]:
+            t_name = item["track"]["name"]
+            a_name = ", ".join([a["name"] for a in item["track"]["artists"]])
+            cover_url = item["track"]["album"]["images"][2]["url"]
+            st.markdown(f"""
+                <div>
+                <img src="{cover_url}" width="90" style="border-radius:15px;"><br>
+                <span style="color:#b3b3b3;font-size:12px;">{t_name}</span><br>
+                <span style="color:#777;font-size:11px;">{a_name}</span>
+                </div>
+            """, unsafe_allow_html=True)
+        st.markdown("</div></div>", unsafe_allow_html=True)
 
     # =========================
     # Auto-refresh
     # =========================
     time.sleep(5)
     st.experimental_rerun()
+
