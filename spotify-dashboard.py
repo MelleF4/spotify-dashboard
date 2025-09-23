@@ -17,7 +17,7 @@ st_autorefresh(interval=5000, limit=None, key="refresh")
 # =========================
 CLIENT_ID = st.secrets["CLIENT_ID"]
 CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
-REDIRECT_URI = st.secrets["REDIRECT_URL"]
+REDIRECT_URI = st.secrets["REDIRECT_URI"]
 SCOPE = "user-read-playback-state,user-read-currently-playing,user-read-recently-played,user-top-read"
 
 sp_oauth = SpotifyOAuth(
@@ -198,5 +198,6 @@ if st.session_state["token_info"]:
                 </div>
             """, unsafe_allow_html=True)
         st.markdown("</div></div>", unsafe_allow_html=True)
+
 
 
