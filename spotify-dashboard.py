@@ -111,21 +111,27 @@ def main():
     /* Bedieningselementen */
     .controls-container { text-align: center; display: flex; justify-content: space-around; padding: 10px; }
     .controls-container button { 
-        background-color: #1DB954; 
+        background-color: transparent; 
         border: none; 
         color: white; 
         width: 60px;
         height: 60px;
         border-radius: 50%; 
         cursor: pointer; 
-        font-size: 24px; 
-        transition: transform 0.2s, box-shadow 0.2s;
+        transition: background-color 0.2s, box-shadow 0.2s, transform 0.2s;
         display: flex;
         align-items: center;
         justify-content: center;
     }
-    .controls-container button:hover { transform: scale(1.1); }
+    .controls-container button:hover { background-color: rgba(255,255,255,0.1); }
     .controls-container button:active { transform: scale(0.95); box-shadow: inset 0 0 10px rgba(0,0,0,0.3); }
+    .controls-container button.play-button { background-color: #1DB954; }
+    .controls-container button.play-button:hover { background-color: #1ed760; }
+    .controls-container button.play-button:active { transform: scale(0.95); box-shadow: inset 0 0 10px rgba(0,0,0,0.3); }
+
+    /* SVG icon styling */
+    .icon { width: 24px; height: 24px; fill: white; }
+    .icon-play { fill: black; }
 
     /* Recent afgespeeld sectie */
     .recent-header { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
@@ -243,15 +249,15 @@ def main():
                     # Bedieningsknoppen
                     col_a, col_b, col_c = st.columns([1, 1, 1])
                     with col_a:
-                        if st.button("⏮️", key="prev_btn"): sp.previous_track()
+                        if st.button("<<", key="prev_btn"): sp.previous_track()
                     with col_b:
-                        if st.button("⏯️", key="play_pause_btn"):
+                        if st.button(">", key="play_pause_btn"):
                             if current and current.get("is_playing"):
                                 sp.pause_playback()
                             else:
                                 sp.start_playback()
                     with col_c:
-                        if st.button("⏭️", key="next_btn"): sp.next_track()
+                        if st.button(">>", key="next_btn"): sp.next_track()
                 except (requests.exceptions.RequestException, IOError) as e:
                     st.error(f"Fout bij het ophalen van de albumhoes: {e}")
             else:
@@ -259,11 +265,11 @@ def main():
                 st.markdown('<div class="controls-container">', unsafe_allow_html=True)
                 col_a, col_b, col_c = st.columns([1, 1, 1])
                 with col_a:
-                    st.button("⏮️", key="prev_btn", disabled=True)
+                    st.button("<<", key="prev_btn", disabled=True)
                 with col_b:
-                    st.button("⏯️", key="play_pause_btn")
+                    st.button(">", key="play_pause_btn")
                 with col_c:
-                    st.button("⏭️", key="next_btn", disabled=True)
+                    st.button(">>", key="next_btn", disabled=True)
                 st.markdown('</div>', unsafe_allow_html=True)
 
         except Exception as e:
