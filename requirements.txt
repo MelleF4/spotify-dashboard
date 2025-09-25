@@ -1,7 +1,5 @@
 streamlit
-spotipy
+pandas
+numpy
 requests
-Pillow
-streamlit-autorefresh
-streamlit-folium
-folium
+polyline
