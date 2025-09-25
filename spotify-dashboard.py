@@ -64,7 +64,7 @@ class SpotifyAPI:
     def __init__(self):
         self.client_id = st.secrets.get("SPOTIFY_CLIENT_ID", "")
         self.client_secret = st.secrets.get("SPOTIFY_CLIENT_SECRET", "")
-        self.redirect_uri = "http://localhost:8501"
+        self.redirect_uri = "https://example.org/callback"
         self.access_token = None
         self.refresh_token = None
         
@@ -750,3 +750,4 @@ class EBikeDashboard:
 if __name__ == "__main__":
     dashboard = EBikeDashboard()
     dashboard.run()
+
