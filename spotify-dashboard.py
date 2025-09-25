@@ -5,9 +5,10 @@ import time
 from datetime import datetime, timedelta
 import requests
 import json
-import base64
 import os
 from typing import Dict, List, Optional
+import spotipy
+from spotipy.oauth2 import SpotifyOAuth
 import polyline
 
 # Page configuration
@@ -57,295 +58,314 @@ st.markdown("""
         background-color: #1e3a1e;
         border-left: 4px solid #00ff00;
     }
+    .spotify-button {
+        background-color: #1DB954;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 20px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+    .graphhopper-attribution {
+        font-size: 0.8rem;
+        color: #666;
+        text-align: center;
+        margin-top: 5px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-class SpotifyAPI:
+class SpotifyManager:
     def __init__(self):
         self.client_id = st.secrets.get("SPOTIFY_CLIENT_ID", "")
         self.client_secret = st.secrets.get("SPOTIFY_CLIENT_SECRET", "")
-        self.redirect_uri = "https://example.org/callback"
-        self.access_token = None
-        self.refresh_token = None
-        
-    def get_auth_url(self):
-        scope = "user-read-playback-state user-modify-playback-state user-read-currently-playing streaming"
-        auth_url = f"https://accounts.spotify.com/authorize?response_type=code&client_id={self.client_id}&scope={scope}&redirect_uri={self.redirect_uri}"
-        return auth_url
-        
-    def get_tokens(self, code):
-        auth_header = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
-        headers = {
-            'Authorization': f'Basic {auth_header}',
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
-        data = {
-            'grant_type': 'authorization_code',
-            'code': code,
-            'redirect_uri': self.redirect_uri
-        }
-        response = requests.post('https://accounts.spotify.com/api/token', headers=headers, data=data)
-        if response.status_code == 200:
-            tokens = response.json()
-            self.access_token = tokens['access_token']
-            self.refresh_token = tokens['refresh_token']
-            return True
-        return False
-        
-    def refresh_access_token(self):
-        auth_header = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
-        headers = {
-            'Authorization': f'Basic {auth_header}',
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
-        data = {
-            'grant_type': 'refresh_token',
-            'refresh_token': self.refresh_token
-        }
-        response = requests.post('https://accounts.spotify.com/api/token', headers=headers, data=data)
-        if response.status_code == 200:
-            tokens = response.json()
-            self.access_token = tokens['access_token']
-            return True
-        return False
-        
-    def make_request(self, endpoint, method='GET', data=None):
-        if not self.access_token:
-            return None
-            
-        headers = {
-            'Authorization': f'Bearer {self.access_token}',
-            'Content-Type': 'application/json'
-        }
-        
-        url = f"https://api.spotify.com/v1{endpoint}"
-        
-        try:
-            if method == 'GET':
-                response = requests.get(url, headers=headers)
-            elif method == 'PUT':
-                response = requests.put(url, headers=headers, json=data)
-            elif method == 'POST':
-                response = requests.post(url, headers=headers, json=data)
-                
-            if response.status_code == 200:
-                return response.json()
-            elif response.status_code == 401:
-                if self.refresh_access_token():
-                    return self.make_request(endpoint, method, data)
-            return None
-        except Exception as e:
-            st.error(f"Spotify API error: {e}")
-            return None
-            
-    def get_current_playback(self):
-        return self.make_request('/me/player')
-        
-    def play_track(self, track_uri=None, context_uri=None):
-        data = {}
-        if track_uri:
-            data['uris'] = [track_uri]
-        elif context_uri:
-            data['context_uri'] = context_uri
-            
-        return self.make_request('/me/player/play', method='PUT', data=data)
-        
-    def pause_playback(self):
-        return self.make_request('/me/player/pause', method='PUT')
-        
-    def next_track(self):
-        return self.make_request('/me/player/next', method='POST')
-        
-    def previous_track(self):
-        return self.make_request('/me/player/previous', method='POST')
-        
-    def search_tracks(self, query, limit=10):
-        endpoint = f"/search?q={query}&type=track&limit={limit}"
-        return self.make_request(endpoint)
-
-class NavigationAPI:
-    def __init__(self):
-        self.provider = st.secrets.get("NAVIGATION_PROVIDER", "openstreetmap")
-        self.api_key = st.secrets.get("NAVIGATION_API_KEY", "")
-        
-    def get_route(self, start_lng, start_lat, end_lng, end_lat):
-        """Get route using the selected provider"""
-        if self.provider == "openstreetmap":
-            return self.get_osm_route(start_lng, start_lat, end_lng, end_lat)
-        elif self.provider == "google":
-            return self.get_google_route(start_lng, start_lat, end_lng, end_lat)
-        elif self.provider == "here":
-            return self.get_here_route(start_lng, start_lat, end_lng, end_lat)
-        else:
-            return self.get_dummy_route(start_lng, start_lat, end_lng, end_lat)
+        self.redirect_uri = "http://localhost:8501"
+        self.scope = "user-read-playback-state user-modify-playback-state user-read-currently-playing streaming user-read-email user-read-private"
+        self.sp = None
+        self.initialize_spotify()
     
-    def get_osm_route(self, start_lng, start_lat, end_lng, end_lat):
-        """Use OpenStreetMap's OSRM API (free, no API key required)"""
+    def initialize_spotify(self):
         try:
-            url = f"http://router.project-osrm.org/route/v1/bicycle/{start_lng},{start_lat};{end_lng},{end_lat}"
-            params = {
-                'overview': 'full',
-                'steps': 'true',
-                'geometries': 'geojson'
-            }
+            self.sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
+                client_id=self.client_id,
+                client_secret=self.client_secret,
+                redirect_uri=self.redirect_uri,
+                scope=self.scope,
+                cache_path=".spotify_cache",
+                show_dialog=True
+            ))
+            if self.sp.current_user():
+                st.session_state.spotify_connected = True
+                return True
+        except Exception as e:
+            st.session_state.spotify_connected = False
+        return False
+    
+    def get_auth_url(self):
+        try:
+            auth_manager = SpotifyOAuth(
+                client_id=self.client_id,
+                client_secret=self.client_secret,
+                redirect_uri=self.redirect_uri,
+                scope=self.scope,
+                cache_path=".spotify_cache",
+                show_dialog=True
+            )
+            return auth_manager.get_authorize_url()
+        except Exception as e:
+            st.error(f"Error getting auth URL: {e}")
+            return None
+    
+    def get_current_playback(self):
+        try:
+            return self.sp.current_playback()
+        except Exception as e:
+            st.error(f"Error getting playback: {e}")
+            return None
+    
+    def play_track(self, track_uri=None, context_uri=None):
+        try:
+            if track_uri:
+                self.sp.start_playback(uris=[track_uri])
+            elif context_uri:
+                self.sp.start_playback(context_uri=context_uri)
+            else:
+                self.sp.start_playback()
+            return True
+        except Exception as e:
+            st.error(f"Error playing track: {e}")
+            return False
+    
+    def pause_playback(self):
+        try:
+            self.sp.pause_playback()
+            return True
+        except Exception as e:
+            st.error(f"Error pausing playback: {e}")
+            return False
+    
+    def next_track(self):
+        try:
+            self.sp.next_track()
+            return True
+        except Exception as e:
+            st.error(f"Error skipping track: {e}")
+            return False
+    
+    def previous_track(self):
+        try:
+            self.sp.previous_track()
+            return True
+        except Exception as e:
+            st.error(f"Error going to previous track: {e}")
+            return False
+    
+    def search_tracks(self, query, limit=10):
+        try:
+            results = self.sp.search(q=query, limit=limit, type='track')
+            return results
+        except Exception as e:
+            st.error(f"Error searching tracks: {e}")
+            return None
+    
+    def set_volume(self, volume):
+        try:
+            self.sp.volume(volume)
+            return True
+        except Exception as e:
+            st.error(f"Error setting volume: {e}")
+            return False
+
+class GraphHopperNavigation:
+    def __init__(self):
+        self.api_key = st.secrets.get("GRAPHHOPPER_API_KEY", "")
+        # You can use the public instance or your own hosted instance
+        self.base_url = "https://graphhopper.com/api/1/route"
+        
+    def geocode_address(self, address):
+        """Geocode an address using GraphHopper Geocoding"""
+        if not self.api_key:
+            return None
             
-            response = requests.get(url, params=params, timeout=10)
+        geocode_url = "https://graphhopper.com/api/1/geocode"
+        params = {
+            'q': address,
+            'limit': 1,
+            'key': self.api_key
+        }
+        
+        try:
+            response = requests.get(geocode_url, params=params, timeout=10)
             if response.status_code == 200:
                 data = response.json()
-                return self.parse_osrm_response(data)
+                if data['hits']:
+                    location = data['hits'][0]['point']
+                    return {'lat': location['lat'], 'lng': location['lng']}
         except Exception as e:
-            st.warning(f"OSRM routing failed: {e}")
+            st.error(f"Geocoding error: {e}")
         
-        return self.get_dummy_route(start_lng, start_lat, end_lng, end_lat)
+        return None
     
-    def parse_osrm_response(self, data):
-        """Parse OSRM response into our standard format"""
-        if data.get('code') != 'Ok' or not data.get('routes'):
-            return self.get_dummy_route(-0.1278, 51.5074, -0.1220, 51.5120)
+    def get_route(self, start_address, end_address, vehicle="bike"):
+        """Get route with turn-by-turn directions using GraphHopper"""
+        if not self.api_key:
+            st.warning("Using demo data - add GraphHopper API key for real routing")
+            return self.get_dummy_route()
         
-        route = data['routes'][0]
-        legs = data['waypoints']
+        # Geocode addresses
+        start_coords = self.geocode_address(start_address)
+        end_coords = self.geocode_address(end_address)
+        
+        if not start_coords or not end_coords:
+            st.error("Kon adressen niet vinden. Controleer de spelling.")
+            return self.get_dummy_route()
+        
+        params = {
+            'key': self.api_key,
+            'vehicle': vehicle,
+            'locale': 'nl',
+            'instructions': True,
+            'calc_points': True,
+            'points_encoded': False,  # Get full coordinates
+            'elevation': True,
+            'optimize': 'true'
+        }
+        
+        # GraphHopper expects points as "lat,lng"
+        points = [
+            f"{start_coords['lat']},{start_coords['lng']}",
+            f"{end_coords['lat']},{end_coords['lng']}"
+        ]
+        
+        try:
+            response = requests.get(
+                self.base_url,
+                params=params,
+                timeout=15
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'paths' in data and data['paths']:
+                    return self.parse_graphhopper_response(data)
+                else:
+                    st.error("Geen route gevonden. Probeer andere adressen.")
+            else:
+                st.error(f"GraphHopper API error: {response.status_code}")
+                
+        except Exception as e:
+            st.error(f"GraphHopper API error: {e}")
+        
+        return self.get_dummy_route()
+    
+    def parse_graphhopper_response(self, data):
+        """Parse GraphHopper response into our standard format"""
+        path = data['paths'][0]
         
         # Extract turn-by-turn instructions
         steps = []
-        for leg in data.get('routes', [])[0].get('legs', []):
-            for step in leg.get('steps', []):
-                steps.append({
-                    'distance': step['distance'],
-                    'instruction': step.get('maneuver', {}).get('instruction', 'Continue'),
-                    'type': step.get('maneuver', {}).get('type', 'continue')
-                })
-        
-        return {
-            'routes': [{
-                'distance': route['distance'],
-                'duration': route['duration'],
-                'geometry': route['geometry'],
-                'steps': steps
-            }],
-            'waypoints': legs
-        }
-    
-    def get_google_route(self, start_lng, start_lat, end_lng, end_lat):
-        """Google Maps Directions API"""
-        if not self.api_key:
-            return self.get_dummy_route(start_lng, start_lat, end_lng, end_lat)
-        
-        try:
-            url = "https://maps.googleapis.com/maps/api/directions/json"
-            params = {
-                'origin': f"{start_lat},{start_lng}",
-                'destination': f"{end_lat},{end_lng}",
-                'mode': 'bicycling',
-                'key': self.api_key
-            }
-            
-            response = requests.get(url, params=params, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                return self.parse_google_response(data)
-        except Exception as e:
-            st.error(f"Google Directions API error: {e}")
-        
-        return self.get_dummy_route(start_lng, start_lat, end_lng, end_lat)
-    
-    def parse_google_response(self, data):
-        """Parse Google Directions API response"""
-        if data.get('status') != 'OK' or not data.get('routes'):
-            return self.get_dummy_route(-0.1278, 51.5074, -0.1220, 51.5120)
-        
-        route = data['routes'][0]['legs'][0]
-        steps = []
-        
-        for step in route.get('steps', []):
+        for instruction in path.get('instructions', []):
             steps.append({
-                'distance': step['distance']['value'],
-                'instruction': step['html_instructions'].replace('<b>', '').replace('</b>', ''),
-                'type': self.classify_google_maneuver(step.get('maneuver', ''))
+                'distance': instruction.get('distance', 0),
+                'instruction': instruction.get('text', ''),
+                'type': self.classify_instruction(instruction),
+                'direction': instruction.get('sign', 0),
+                'time': instruction.get('time', 0) // 1000  # Convert to seconds
             })
         
+        # Extract route geometry
+        coordinates = path.get('points', {}).get('coordinates', [])
+        
         return {
             'routes': [{
-                'distance': route['distance']['value'],
-                'duration': route['duration']['value'],
-                'steps': steps
-            }]
+                'distance': path.get('distance', 0),
+                'duration': path.get('time', 0) // 1000,  # Convert to seconds
+                'geometry': {'coordinates': coordinates},
+                'steps': steps,
+                'elevation': path.get('ascend', 0),
+                'descent': path.get('descend', 0)
+            }],
+            'info': {
+                'copyright': 'GraphHopper',
+                'took': data.get('info', {}).get('took', 0)
+            }
         }
     
-    def classify_google_maneuver(self, maneuver):
-        """Classify Google Maps maneuver types"""
-        turn_maneuvers = ['turn-left', 'turn-right', 'turn-slight-left', 'turn-slight-right']
-        if maneuver in turn_maneuvers:
-            return 'turn'
-        elif 'merge' in maneuver or 'fork' in maneuver:
-            return 'continue'
-        elif 'depart' in maneuver:
-            return 'depart'
-        elif 'arrive' in maneuver:
+    def classify_instruction(self, instruction):
+        """Classify instruction type for icons based on GraphHopper sign codes"""
+        sign = instruction.get('sign', 0)
+        
+        # GraphHopper sign codes:
+        # -3 = sharp left, -2 = left, -1 = slight left
+        # 0 = continue/straight
+        # 1 = slight right, 2 = right, 3 = sharp right
+        # 4 = finish, 5 = via, 6 = roundabout
+        
+        if sign == 4:  # Finish
             return 'arrive'
-        return 'continue'
+        elif sign == 6:  # Roundabout
+            return 'roundabout'
+        elif sign in [-3, -2, -1]:  # Left turns
+            return 'turn-left'
+        elif sign in [1, 2, 3]:  # Right turns
+            return 'turn-right'
+        elif sign == 0:  # Continue
+            return 'continue'
+        else:
+            return 'continue'
     
-    def get_here_route(self, start_lng, start_lat, end_lng, end_lat):
-        """HERE Maps API"""
-        if not self.api_key:
-            return self.get_dummy_route(start_lng, start_lat, end_lng, end_lat)
-        
-        try:
-            url = "https://router.hereapi.com/v8/routes"
-            params = {
-                'transportMode': 'bicycle',
-                'origin': f"{start_lat},{start_lng}",
-                'destination': f"{end_lat},{end_lng}",
-                'return': 'polyline,actions,instructions',
-                'apiKey': self.api_key
-            }
-            
-            response = requests.get(url, params=params, timeout=10)
-            if response.status_code == 200:
-                return self.parse_here_response(response.json())
-        except Exception as e:
-            st.error(f"HERE API error: {e}")
-        
-        return self.get_dummy_route(start_lng, start_lat, end_lng, end_lat)
+    def get_direction_icon_from_sign(self, sign):
+        """Get icon based on GraphHopper sign code"""
+        icons = {
+            -3: '↰',  # Sharp left
+            -2: '↩️',  # Left
+            -1: '↖️',  # Slight left
+            0: '⬆️',   # Continue
+            1: '↗️',   # Slight right
+            2: '↪️',   # Right
+            3: '↱',    # Sharp right
+            4: '🏁',   # Arrive
+            6: '🔄'    # Roundabout
+        }
+        return icons.get(sign, '📍')
     
-    def get_dummy_route(self, start_lng, start_lat, end_lng, end_lat):
-        """Fallback route with realistic data"""
-        # Generate intermediate points for a realistic route
-        num_points = 20
-        lng_points = np.linspace(start_lng, end_lng, num_points)
-        lat_points = np.linspace(start_lat, end_lat, num_points)
-        
-        # Add some curvature to make it look realistic
-        for i in range(1, num_points-1):
-            lat_points[i] += np.sin(i * 0.5) * 0.001
-        
-        coordinates = list(zip(lng_points, lat_points))
-        
+    def get_dummy_route(self):
+        """Fallback route data voor demo"""
         instructions = [
-            {"distance": 200, "instruction": "Head north on Main Street", "type": "depart"},
-            {"distance": 1500, "instruction": "Turn right onto Oak Avenue", "type": "turn"},
-            {"distance": 800, "instruction": "Continue straight through the roundabout", "type": "continue"},
-            {"distance": 1200, "instruction": "Turn left onto Park Road", "type": "turn"},
-            {"distance": 500, "instruction": "Destination on your left", "type": "arrive"}
+            {"distance": 200, "instruction": "Vertrek vanaf startpunt", "type": "depart", "direction": 0, "time": 30},
+            {"distance": 1500, "instruction": "Rechtsaf slaan op Hoofdstraat", "type": "turn-right", "direction": 2, "time": 200},
+            {"distance": 800, "instruction": "Rechtdoor op rotonde", "type": "roundabout", "direction": 6, "time": 100},
+            {"distance": 1200, "instruction": "Linksaf slaan op Parkweg", "type": "turn-left", "direction": -2, "time": 180},
+            {"distance": 500, "instruction": "Bestemming bereikt", "type": "arrive", "direction": 4, "time": 60}
+        ]
+        
+        # Demo coordinates for Amsterdam area
+        coordinates = [
+            [4.8970, 52.3779], [4.8980, 52.3785], [4.8990, 52.3790],
+            [4.9000, 52.3795], [4.9010, 52.3800], [4.9020, 52.3805],
+            [4.9030, 52.3810]
         ]
         
         return {
             'routes': [{
-                'distance': 4200,  # meters
-                'duration': 900,   # seconds
+                'distance': 4200,
+                'duration': 900,
                 'geometry': {'coordinates': coordinates},
-                'steps': instructions
+                'steps': instructions,
+                'elevation': 15,
+                'descent': 12
             }],
-            'waypoints': [
-                {'location': [start_lng, start_lat]},
-                {'location': [end_lng, end_lat]}
-            ]
+            'info': {
+                'copyright': 'GraphHopper Demo',
+                'took': 50
+            }
         }
 
 class EBikeDashboard:
     def __init__(self):
-        self.spotify = SpotifyAPI()
-        self.navigation = NavigationAPI()
+        self.spotify = SpotifyManager()
+        self.navigation = GraphHopperNavigation()
         self.initialize_session_state()
     
     def initialize_session_state(self):
@@ -355,15 +375,16 @@ class EBikeDashboard:
             'distance': 0,
             'assist_level': 1,
             'is_riding': False,
-            'current_song': "Not Playing",
+            'current_song': "Niet actief",
             'destination': "",
+            'current_address': "Amsterdam, Nederland",
             'eta': "00:00",
             'route': None,
             'current_step': 0,
             'spotify_connected': False,
-            'auth_code': None,
-            'current_location': {"lat": 51.5074, "lng": -0.1278},  # Default: London
-            'navigation_provider': 'openstreetmap'
+            'volume': 50,
+            'total_calories': 0,
+            'vehicle_type': 'bike'
         }
         
         for key, value in default_state.items():
@@ -379,7 +400,7 @@ class EBikeDashboard:
         with col1:
             st.markdown(f"""
             <div class="metric-card">
-                <h3>🔋 Battery</h3>
+                <h3>🔋 Accu</h3>
                 <h2>{st.session_state.battery_level}%</h2>
                 <progress value="{st.session_state.battery_level}" max="100"></progress>
             </div>
@@ -388,7 +409,7 @@ class EBikeDashboard:
         with col2:
             st.markdown(f"""
             <div class="metric-card">
-                <h3>⚡ Speed</h3>
+                <h3>⚡ Snelheid</h3>
                 <h2>{st.session_state.speed} km/h</h2>
             </div>
             """, unsafe_allow_html=True)
@@ -396,7 +417,7 @@ class EBikeDashboard:
         with col3:
             st.markdown(f"""
             <div class="metric-card">
-                <h3>📏 Distance</h3>
+                <h3>📏 Afstand</h3>
                 <h2>{st.session_state.distance:.1f} km</h2>
             </div>
             """, unsafe_allow_html=True)
@@ -404,153 +425,188 @@ class EBikeDashboard:
         with col4:
             st.markdown(f"""
             <div class="metric-card">
-                <h3>🔄 Assist Level</h3>
-                <h2>{st.session_state.assist_level}/5</h2>
+                <h3>🔥 Calorieën</h3>
+                <h2>{st.session_state.total_calories:.0f}</h2>
             </div>
             """, unsafe_allow_html=True)
     
     def display_spotify_auth(self):
-        if not st.session_state.spotify_connected:
-            st.markdown("### 🔐 Connect Spotify")
-            auth_url = self.spotify.get_auth_url()
-            st.markdown(f"[Connect Spotify Account]({auth_url})")
-            
-            auth_code = st.text_input("Enter authorization code from Spotify:")
-            if auth_code and st.button("Connect"):
-                if self.spotify.get_tokens(auth_code):
-                    st.session_state.spotify_connected = True
-                    st.session_state.auth_code = auth_code
-                    st.rerun()
+        st.markdown("### 🔐 Verbind met Spotify")
+        st.write("Klik op de knop om je Spotify account te verbinden:")
+        
+        auth_url = self.spotify.get_auth_url()
+        if auth_url:
+            st.markdown(f'<a href="{auth_url}" target="_blank"><button class="spotify-button">Spotify Verbinden</button></a>', 
+                       unsafe_allow_html=True)
+        
+        st.info("Na het klikken word je doorgestuurd naar Spotify. Autoriseer de app en je komt terug in het dashboard.")
+        
+        try:
+            query_params = st.experimental_get_query_params()
+            if 'code' in query_params:
+                code = query_params['code'][0]
+                st.success("Succesvol verbonden met Spotify!")
+                st.session_state.spotify_connected = True
+                st.experimental_set_query_params()
+        except:
+            pass
     
     def display_spotify_player(self):
         if not st.session_state.spotify_connected:
             self.display_spotify_auth()
             return
-            
+        
         st.markdown("""
         <div class="spotify-player">
-            <h2>🎵 Spotify Player</h2>
+            <h2>🎵 Spotify Speler</h2>
         </div>
         """, unsafe_allow_html=True)
         
-        # Current playback info
         playback = self.spotify.get_current_playback()
+        
         if playback and playback.get('is_playing'):
             track = playback['item']
-            st.session_state.current_song = f"{track['name']} - {track['artists'][0]['name']}"
+            artists = ", ".join([artist['name'] for artist in track['artists']])
+            st.session_state.current_song = f"{track['name']} - {artists}"
+            
             col1, col2 = st.columns([1, 3])
             with col1:
-                st.image(track['album']['images'][0]['url'], width=100)
+                if track['album']['images']:
+                    st.image(track['album']['images'][0]['url'], width=150)
             with col2:
-                st.write(f"**{track['name']}** by {track['artists'][0]['name']}")
-                st.write(f"Album: {track['album']['name']}")
+                st.write(f"**🎵 Nu aan het spelen**")
+                st.write(f"**{track['name']}**")
+                st.write(f"**Door:** {artists}")
+                st.write(f"**Album:** {track['album']['name']}")
+                
+                if playback.get('progress_ms') and track['duration_ms']:
+                    progress = playback['progress_ms'] / track['duration_ms']
+                    st.progress(progress)
+                    current_time = str(timedelta(milliseconds=playback['progress_ms']))[2:7]
+                    total_time = str(timedelta(milliseconds=track['duration_ms']))[2:7]
+                    st.write(f"{current_time} / {total_time}")
         else:
-            st.session_state.current_song = "Not Playing"
-            st.write("No music currently playing")
+            st.session_state.current_song = "Niet actief"
+            st.write("**Er wordt momenteel geen muziek afgespeeld**")
         
-        # Player controls
+        # Bedieningselementen
+        st.subheader("Speler Bediening")
         col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
-            if st.button("⏮️ Previous"):
-                self.spotify.previous_track()
-                st.rerun()
+            if st.button("⏮️ Vorige"):
+                if self.spotify.previous_track():
+                    st.rerun()
         
         with col2:
-            if st.button("⏯️ Play/Pause"):
-                if playback and playback.get('is_playing'):
-                    self.spotify.pause_playback()
-                else:
-                    self.spotify.play_track()
-                st.rerun()
+            if playback and playback.get('is_playing'):
+                if st.button("⏸️ Pause"):
+                    if self.spotify.pause_playback():
+                        st.rerun()
+            else:
+                if st.button("▶️ Afspelen"):
+                    if self.spotify.play_track():
+                        st.rerun()
         
         with col3:
-            if st.button("⏭️ Next"):
-                self.spotify.next_track()
+            if st.button("⏭️ Volgende"):
+                if self.spotify.next_track():
+                    st.rerun()
+        
+        with col4:
+            new_volume = st.slider("🔊 Volume", 0, 100, st.session_state.volume)
+            if new_volume != st.session_state.volume:
+                if self.spotify.set_volume(new_volume):
+                    st.session_state.volume = new_volume
+        
+        with col5:
+            if st.button("🔄 Vernieuwen"):
                 st.rerun()
         
-        # Search and play
-        st.subheader("Search Music")
-        search_query = st.text_input("Search for songs, artists, or albums:")
+        # Zoekfunctionaliteit
+        st.subheader("🔍 Zoek Muziek")
+        search_query = st.text_input("Zoek naar nummers, artiesten of albums:")
         if search_query:
-            results = self.spotify.search_tracks(search_query)
+            results = self.spotify.search_tracks(search_query, limit=5)
             if results and 'tracks' in results:
-                for track in results['tracks']['items'][:5]:
-                    col1, col2 = st.columns([1, 4])
+                st.write("### Zoekresultaten")
+                for track in results['tracks']['items']:
+                    artists = ", ".join([artist['name'] for artist in track['artists']])
+                    col1, col2, col3 = st.columns([1, 3, 1])
                     with col1:
-                        st.image(track['album']['images'][0]['url'] if track['album']['images'] else None, width=50)
+                        if track['album']['images']:
+                            st.image(track['album']['images'][0]['url'], width=60)
                     with col2:
-                        if st.button(f"Play {track['name']}", key=track['id']):
-                            self.spotify.play_track(track['uri'])
-                            st.rerun()
-    
+                        st.write(f"**{track['name']}**")
+                        st.write(f"*{artists}*")
+                    with col3:
+                        if st.button("Afspelen", key=track['id']):
+                            if self.spotify.play_track(track['uri']):
+                                st.success(f"Speelt af: {track['name']}")
+                                st.rerun()
+
     def display_navigation(self):
         st.markdown("""
         <div class="navigation-panel">
-            <h2>🧭 Navigation</h2>
+            <h2>🧭 GraphHopper Navigatie</h2>
         </div>
         """, unsafe_allow_html=True)
         
-        # Navigation provider selection
+        st.info("🚴 Gebruik GraphHopper voor optimale fietsroutes met turn-by-turn instructies")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📍 Startadres")
+            start_address = st.text_input("Huidige locatie", 
+                                        value=st.session_state.current_address,
+                                        help="Vul je startadres in")
+        
+        with col2:
+            st.subheader("🎯 Bestemming")
+            destination = st.text_input("Waar naartoe?", 
+                                      value=st.session_state.destination,
+                                      placeholder="Vul je bestemming in")
+        
+        # Voertuigtype selectie
         col1, col2 = st.columns(2)
         with col1:
-            provider = st.selectbox(
-                "Navigation Provider",
-                ["openstreetmap", "google", "here"],
+            vehicle_type = st.selectbox(
+                "Voertuigtype",
+                ["bike", "racingbike", "mtb", "foot"],
                 format_func=lambda x: {
-                    "openstreetmap": "OpenStreetMap (Free)",
-                    "google": "Google Maps",
-                    "here": "HERE Maps"
+                    "bike": "🚲 Standaard Fiets",
+                    "racingbike": "🚴 Racefiets",
+                    "mtb": "🚵 Mountainbike",
+                    "foot": "🚶‍♂️ Lopen"
                 }[x]
             )
-            if provider != st.session_state.navigation_provider:
-                st.session_state.navigation_provider = provider
-                self.navigation.provider = provider
         
-        with col2:
-            if provider != "openstreetmap":
-                api_key = st.text_input(f"{provider.capitalize()} API Key", type="password")
-                if api_key:
-                    self.navigation.api_key = api_key
-        
-        # Destination input
-        col1, col2, col3 = st.columns([2, 1, 1])
-        
-        with col1:
-            destination = st.text_input("Enter Destination Address:", value=st.session_state.destination)
-        
-        with col2:
-            if st.button("📍 Use Current Location"):
-                # Simulate getting current location
-                st.session_state.current_location = {"lat": 51.5074, "lng": -0.1278}
-                st.success("Location set to London")
-        
-        with col3:
-            if st.button("🚴 Start Navigation") and destination:
-                self.calculate_route(destination)
+        if st.button("🚴 Route Berekenen", type="primary"):
+            if start_address and destination:
+                with st.spinner("Berekenen optimale route..."):
+                    route_data = self.navigation.get_route(start_address, destination, vehicle_type)
+                    if route_data:
+                        st.session_state.route = route_data
+                        st.session_state.current_step = 0
+                        st.session_state.destination = destination
+                        st.session_state.current_address = start_address
+                        st.session_state.vehicle_type = vehicle_type
+                        
+                        if route_data['routes']:
+                            duration_min = route_data['routes'][0]['duration'] // 60
+                            st.session_state.eta = f"{duration_min} min"
+                            st.success(f"Route gevonden! Geschatte tijd: {duration_min} minuten")
+                    else:
+                        st.error("Kon route niet berekenen. Controleer de adressen.")
+            else:
+                st.warning("Vul zowel startadres als bestemming in.")
         
         if st.session_state.route:
             self.display_route_map()
             self.display_turn_by_turn()
         else:
-            st.info("Enter a destination to start navigation")
-    
-    def calculate_route(self, destination):
-        start_lng = st.session_state.current_location["lng"]
-        start_lat = st.session_state.current_location["lat"]
-        
-        # Simulate geocoding - in real app, you'd use a geocoding service
-        end_lng, end_lat = start_lng + 0.01, start_lat + 0.01  # Nearby point
-        
-        route_data = self.navigation.get_route(start_lng, start_lat, end_lng, end_lat)
-        st.session_state.route = route_data
-        st.session_state.current_step = 0
-        st.session_state.destination = destination
-        
-        # Calculate ETA
-        if route_data['routes']:
-            duration_min = route_data['routes'][0]['duration'] // 60
-            st.session_state.eta = f"{duration_min} min"
+            st.info("Vul startadres en bestemming in om je route te berekenen")
     
     def display_route_map(self):
         if not st.session_state.route:
@@ -559,111 +615,113 @@ class EBikeDashboard:
         route = st.session_state.route['routes'][0]
         coordinates = route['geometry']['coordinates']
         
-        # Create map data
+        # GraphHopper geeft [lng, lat] terug, Streamlit wil [lat, lng]
         map_data = pd.DataFrame(coordinates, columns=['lon', 'lat'])
         
-        st.subheader("Route Map")
-        st.map(map_data, zoom=13)
+        st.subheader("🗺️ Route Overzicht")
+        st.map(map_data, zoom=12)
         
-        # Route info
-        col1, col2, col3 = st.columns(3)
+        # Route samenvatting
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("Total Distance", f"{route['distance']/1000:.1f} km")
+            st.metric("Totale Afstand", f"{route['distance']/1000:.1f} km")
         with col2:
-            st.metric("Estimated Time", st.session_state.eta)
+            st.metric("Geschatte Tijd", st.session_state.eta)
         with col3:
-            st.metric("Calories Burned", f"{(route['distance']/1000 * 30):.0f}")
+            st.metric("Hoogteverschil", f"{route.get('elevation', 0):.0f} m")
+        with col4:
+            st.metric("CO2 Besparing", f"{(route['distance']/1000 * 0.2):.1f} kg")
+        
+        st.markdown('<div class="graphhopper-attribution">Route data © GraphHopper</div>', 
+                   unsafe_allow_html=True)
     
     def display_turn_by_turn(self):
-        st.subheader("Turn-by-Turn Directions")
+        st.subheader("🔄 Turn-by-Turn Instructies")
         
         if not st.session_state.route or not st.session_state.route['routes'][0].get('steps'):
-            st.info("No turn-by-turn directions available for this route")
+            st.info("Geen turn-by-turn instructies beschikbaar")
             return
         
         instructions = st.session_state.route['routes'][0]['steps']
         current_step = st.session_state.current_step
         
+        # Huidige stap prominent weergeven
+        if current_step < len(instructions):
+            current_instruction = instructions[current_step]
+            icon = self.navigation.get_direction_icon_from_sign(current_instruction.get('direction', 0))
+            st.markdown(f"### 🟢 Huidig: {icon} {current_instruction['instruction']}")
+            st.write(f"**Afstand tot volgende actie:** {current_instruction['distance']:.0f}m")
+            st.write(f"**Tijd:** {current_instruction['time']} seconden")
+        
+        st.write("---")
+        st.write("### Volledige Route Instructies:")
+        
         for i, instruction in enumerate(instructions):
             distance = instruction['distance']
             instruction_text = instruction['instruction']
-            step_type = instruction['type']
+            direction = instruction.get('direction', 0)
+            time_sec = instruction.get('time', 0)
             
-            icon = self.get_direction_icon(step_type)
-            distance_text = f"{distance}m" if distance < 1000 else f"{distance/1000:.1f}km"
+            icon = self.navigation.get_direction_icon_from_sign(direction)
+            distance_text = f"{distance:.0f}m" if distance < 1000 else f"{distance/1000:.1f}km"
             
-            # Create a unique class for current step
             step_class = "turn-instruction current-step" if i == current_step else "turn-instruction"
             
             col1, col2 = st.columns([1, 4])
             with col1:
                 st.markdown(f"<h3>{icon}</h3>", unsafe_allow_html=True)
-                if i == current_step:
-                    st.markdown("**🟢 CURRENT**")
             with col2:
                 st.markdown(f"<div class='{step_class}'>"
                            f"<b>{instruction_text}</b><br>"
-                           f"<i>{distance_text} ahead</i></div>", unsafe_allow_html=True)
+                           f"<i>{distance_text} • {time_sec}s</i></div>", 
+                           unsafe_allow_html=True)
         
-        # Navigation controls
-        col1, col2, col3 = st.columns([1, 1, 1])
+        # Navigatie bediening
+        col1, col2, col3 = st.columns([1, 2, 1])
         with col1:
-            if st.button("⬅️ Previous Step") and current_step > 0:
+            if st.button("⬅️ Vorige Stap") and current_step > 0:
                 st.session_state.current_step -= 1
                 st.rerun()
         with col2:
-            st.write(f"Step {current_step + 1} of {len(instructions)}")
+            st.write(f"**Stap {current_step + 1} van {len(instructions)}**")
+            st.progress((current_step + 1) / len(instructions))
         with col3:
-            if st.button("➡️ Next Step") and current_step < len(instructions) - 1:
+            if st.button("➡️ Volgende Stap") and current_step < len(instructions) - 1:
                 st.session_state.current_step += 1
                 st.rerun()
     
-    def get_direction_icon(self, instruction_type):
-        icons = {
-            "depart": "🚦 Depart",
-            "turn": "↪️ Turn",
-            "continue": "⬆️ Continue",
-            "arrive": "🏁 Arrive",
-            "left": "↩️ Left",
-            "right": "↪️ Right"
-        }
-        return icons.get(instruction_type, "📍")
-    
     def display_controls(self):
-        st.sidebar.header("eBike Controls")
+        st.sidebar.header("eBike Bediening")
         
-        # Power control
-        ride_status = "Stop Ride" if st.session_state.is_riding else "Start Ride"
-        if st.sidebar.button(f"🚦 {ride_status}"):
+        ride_status = "Rit Stoppen" if st.session_state.is_riding else "Rit Starten"
+        if st.sidebar.button(f"🚦 {ride_status}", use_container_width=True):
             st.session_state.is_riding = not st.session_state.is_riding
             if st.session_state.is_riding:
                 self.start_ride()
             else:
                 self.stop_ride()
         
-        # Assist level control
-        st.sidebar.subheader("Pedal Assist Level")
+        st.sidebar.subheader("Ondersteuningsniveau")
         new_level = st.sidebar.slider("", 1, 5, st.session_state.assist_level, key="assist_slider")
         if new_level != st.session_state.assist_level:
             st.session_state.assist_level = new_level
         
-        # Battery management
-        st.sidebar.subheader("Battery Management")
+        st.sidebar.subheader("Accu Beheer")
         st.sidebar.progress(st.session_state.battery_level / 100)
         
         col1, col2 = st.sidebar.columns(2)
         with col1:
-            if st.button("🔋 Drain"):
+            if st.button("🔋 Verbruik", use_container_width=True):
                 self.simulate_battery_drain()
         with col2:
-            if st.button("🔌 Charge"):
+            if st.button("🔌 Opladen", use_container_width=True):
                 self.simulate_charge()
         
-        # Ride statistics
-        st.sidebar.subheader("Ride Statistics")
-        st.sidebar.metric("Total Distance", f"{st.session_state.distance:.1f} km")
-        st.sidebar.metric("Average Speed", f"{st.session_state.speed:.1f} km/h")
-        st.sidebar.metric("CO2 Saved", f"{(st.session_state.distance * 0.2):.1f} kg")
+        st.sidebar.subheader("Rit Statistieken")
+        st.sidebar.metric("Totale Afstand", f"{st.session_state.distance:.1f} km")
+        st.sidebar.metric("Gemiddelde Snelheid", f"{st.session_state.speed:.1f} km/h")
+        st.sidebar.metric("Calorieën Verbrand", f"{st.session_state.total_calories:.0f}")
+        st.sidebar.metric("CO2 Bespaard", f"{(st.session_state.distance * 0.2):.1f} kg")
     
     def simulate_battery_drain(self):
         if st.session_state.battery_level > 0:
@@ -683,20 +741,17 @@ class EBikeDashboard:
     
     def update_ride_data(self):
         if st.session_state.is_riding:
-            # Simulate riding data changes
             st.session_state.speed = max(0, min(30, st.session_state.speed + np.random.uniform(-1, 1)))
             st.session_state.distance += st.session_state.speed / 3600
-            
-            # Battery drains based on speed and assist level
             battery_drain = (st.session_state.speed * st.session_state.assist_level) / 5000
             st.session_state.battery_level = max(0, st.session_state.battery_level - battery_drain)
+            st.session_state.total_calories = st.session_state.distance * 40
     
     def run(self):
         self.display_header()
         self.display_metrics()
         
-        # Main content area
-        tab1, tab2, tab3 = st.tabs(["🎵 Music", "🧭 Navigation", "📊 Statistics"])
+        tab1, tab2, tab3 = st.tabs(["🎵 Muziek", "🧭 Navigatie", "📊 Statistieken"])
         
         with tab1:
             self.display_spotify_player()
@@ -707,16 +762,12 @@ class EBikeDashboard:
         with tab3:
             self.display_statistics()
         
-        # Sidebar controls
         self.display_controls()
-        
-        # Auto-update ride data
         self.update_ride_data()
 
     def display_statistics(self):
-        st.subheader("📊 Ride Statistics")
+        st.subheader("📊 Rit Statistieken")
         
-        # Generate sample ride data
         dates = pd.date_range(start='2024-01-01', end='2024-01-30', freq='D')
         ride_data = pd.DataFrame({
             'Date': dates,
@@ -725,29 +776,28 @@ class EBikeDashboard:
             'Calories Burned': np.random.uniform(150, 400, len(dates))
         })
         
-        # Display charts
         col1, col2 = st.columns(2)
         
         with col1:
             st.line_chart(ride_data.set_index('Date')['Distance'])
-            st.write("Daily Distance (km)")
+            st.write("Dagelijkse Afstand (km)")
         
         with col2:
             st.line_chart(ride_data.set_index('Date')['Average Speed'])
-            st.write("Average Speed (km/h)")
+            st.write("Gemiddelde Snelheid (km/h)")
         
-        # Monthly summary
-        st.subheader("Monthly Summary")
-        summary_cols = st.columns(3)
+        st.subheader("Maandoverzicht")
+        summary_cols = st.columns(4)
         with summary_cols[0]:
-            st.metric("Total Distance", f"{ride_data['Distance'].sum():.1f} km")
+            st.metric("Totale Afstand", f"{ride_data['Distance'].sum():.1f} km")
         with summary_cols[1]:
-            st.metric("Total Rides", len(ride_data))
+            st.metric("Totaal Ritten", len(ride_data))
         with summary_cols[2]:
-            st.metric("CO2 Saved", f"{(ride_data['Distance'].sum() * 0.2):.1f} kg")
+            st.metric("Totaal Calorieën", f"{ride_data['Calories Burned'].sum():.0f}")
+        with summary_cols[3]:
+            st.metric("CO2 Bespaard", f"{(ride_data['Distance'].sum() * 0.2):.1f} kg")
 
 # Run the dashboard
 if __name__ == "__main__":
     dashboard = EBikeDashboard()
     dashboard.run()
-
